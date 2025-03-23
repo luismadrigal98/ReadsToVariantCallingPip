@@ -42,7 +42,7 @@ def get_job_count(user=None):
         logging.error(f"Error checking job count for user {user}")
         return 0
 
-def submit_jobs_with_limit(job_files, max_jobs=5000, sleep_time=60):
+def submit_jobs_with_limit(job_files, max_jobs=4900, sleep_time=60):
     """
     Submit jobs while respecting a maximum job limit.
     

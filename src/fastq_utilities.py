@@ -229,8 +229,11 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l33
                 out2 = r2_file.replace(".gz", "_preprocessed.fastq.gz")
                 
                 # Generate paired-end fastp command
-                fastp_command = (f"{fastp_path} -w {cpus} --correction -i {r1_file} -o {output_dir}/{out1} "
-                                f"-I {r2_file} -O {output_dir}/{out2} {fastp_control_param}")
+                fastp_command = (f"{fastp_path} -w {cpus} --correction "
+                                    f"-i {os.path.join(batch_dir, r1_file)} "
+                                    f"-o {output_dir}/{out1} "
+                                    f"-I {os.path.join(batch_dir, r2_file)} "
+                                    f"-O {output_dir}/{out2} {fastp_control_param}")
                 
                 job_script_path = os.path.join(job_dir, f"fastp_paired_{sample_id}_job.sh")
                 
@@ -262,8 +265,9 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l33
                 out_file = single_file.replace(".gz", "_preprocessed.fastq.gz")
                 
                 # Generate single-end fastp command (note: no -I or -O parameters)
-                fastp_command = (f"{fastp_path} -w {cpus} -i {single_file} -o {output_dir}/{out_file} "
-                                f"{fastp_control_param}")
+                fastp_command = (f"{fastp_path} -w {cpus} "
+                                    f"-i {os.path.join(batch_dir, single_file)} "
+                                    f"-o {output_dir}/{out_file} {fastp_control_param}")
                 
                 job_script_path = os.path.join(job_dir, f"fastp_single_{sample_id}_job.sh")
                 

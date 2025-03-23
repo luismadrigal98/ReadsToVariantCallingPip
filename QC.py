@@ -20,7 +20,7 @@ import subprocess
 import time
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 # Include the source directory in the path
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))

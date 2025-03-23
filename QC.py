@@ -16,8 +16,6 @@ import os
 import argparse
 import sys
 import logging
-import subprocess
-import time
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -77,7 +75,7 @@ def main():
 
     # Workflow command (runs all steps)
     workflow_parser = subparsers.add_parser("workflow", parents=[common_parser], 
-                                        help="Run complete workflow (split, compress, fastp)")
+                                        help="Run complete workflow (split, compress, fastp). Notice that this is meant to be run with the submit flag enabled.")
     workflow_parser.add_argument("--input-dirs", type=str, nargs="+", required=True, 
                             help="Directories containing original FASTQ files")
     workflow_parser.add_argument("--split-dirs", type=str, nargs="+", required=True,

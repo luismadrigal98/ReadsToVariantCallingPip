@@ -12,6 +12,44 @@ def create_directory(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
 
+def detect_file_type(input_dir):
+    """
+    Analyze FASTQ files in a directory to determine if they are paired-end or single-end.
+    
+    Parameters:
+    input_dir (str): Directory containing FASTQ files
+    
+    Returns:
+    dict: Dictionary with lists of paired and single files
+    """
+    fastq_files = [f for f in os.listdir(input_dir) if f.endswith(('.fastq.gz', '.fq.gz'))]
+    
+    # Initialize result structure
+    result = {
+        'paired_files': [],  # Will hold tuples of (R1, R2)
+        'single_files': [],  # Will hold single-end files
+    }
+    
+    # First identify potential pairs (Illumina naming convention)
+    r1_files = [f for f in fastq_files if '_R1_' in f]
+    r2_files = [f for f in fastq_files if '_R2_' in f]
+    
+    # Match pairs
+    paired = set()
+    for r1 in r1_files:
+        r2_candidate = r1.replace('_R1_', '_R2_')
+        if r2_candidate in r2_files:
+            result['paired_files'].append((r1, r2_candidate))
+            paired.add(r1)
+            paired.add(r2_candidate)
+    
+    # All other files are considered single-end
+    for f in fastq_files:
+        if f not in paired:
+            result['single_files'].append(f)
+    
+    logging.info(f"Found {len(result['paired_files'])} paired-end file sets and {len(result['single_files'])} single-end files")
+    return result
 
 def get_sample_structure(input_directories):
     """
@@ -36,6 +74,7 @@ def generate_split_jobs(input_dirs, output_dirs, job_dirs, lines=4000000, partit
                         time="6:00:00", email="l338m483@ku.edu", mem_per_cpu="5g", cpus=10):
     """
     Generate SLURM job scripts to decompress and split FASTQ files.
+    Handles both single-end and paired-end files.
     
     Parameters:
     input_dirs (list): List of directories containing FASTQ files
@@ -55,10 +94,16 @@ def generate_split_jobs(input_dirs, output_dirs, job_dirs, lines=4000000, partit
         create_directory(job_dir)
         
         try:
-            files = [f for f in os.listdir(input_dir) if f.endswith(".fastq.gz")]
+            # Get all FASTQ files regardless of naming convention
+            files = [f for f in os.listdir(input_dir) if f.endswith(('.fastq.gz', '.fq.gz'))]
             
             for file in files:
-                name = file.replace(".fastq.gz", "_")
+                # Create a clean name for the split files
+                if file.endswith('.fastq.gz'):
+                    name = file.replace(".fastq.gz", "_")
+                elif file.endswith('.fq.gz'):
+                    name = file.replace(".fq.gz", "_")
+                
                 job_script_path = os.path.join(job_dir, f"Split_{name}job.sh")
                 
                 with open(job_script_path, "w") as script:
@@ -146,7 +191,7 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l33
                         partition="sixhour", time="6:00:00", email="l338m483@ku.edu", 
                         mem_per_cpu="5g", cpus=10):
     """
-    Generate SLURM job scripts to run fastp on paired FASTQ files.
+    Generate SLURM job scripts to run fastp on FASTQ files, handling both paired and single-end reads.
     
     Parameters:
     batch_dirs (list): List of directories containing FASTQ files
@@ -166,59 +211,79 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l33
         create_directory(job_dir)
         
         try:
-            filesR1 = []
-            filesR2 = []
+            # Detect file types in the directory
+            file_types = detect_file_type(batch_dir)
             
-            filenames = os.listdir(batch_dir)
+            # Process paired-end files
+            for r1_file, r2_file in file_types['paired_files']:
+                # Extract a meaningful name for the job
+                # Try to get the sample ID from the filename (assumes format like SAMPLE_S1_L001_R1_001.fastq.gz)
+                sample_id = r1_file.split('_')[0]
+                
+                out1 = r1_file.replace(".gz", "_preprocessed.fastq.gz")
+                out2 = r2_file.replace(".gz", "_preprocessed.fastq.gz")
+                
+                # Generate paired-end fastp command
+                fastp_command = (f"{fastp_path} -w {cpus} --correction -i {r1_file} -o {output_dir}/{out1} "
+                                f"-I {r2_file} -O {output_dir}/{out2} -3 --complexity_threshold=20 "
+                                f"--length_required=50 --cut_window_size=3 --cut_mean_quality=30")
+                
+                job_script_path = os.path.join(job_dir, f"fastp_paired_{sample_id}_job.sh")
+                
+                with open(job_script_path, "w") as script:
+                    script.write("#!/bin/bash\n")
+                    script.write(f"#SBATCH --job-name=fastp_paired_{sample_id}_job\n")
+                    script.write(f"#SBATCH --output=fastp_paired_{sample_id}_output\n")
+                    script.write(f"#SBATCH --partition={partition}\n")
+                    script.write("#SBATCH --nodes=1\n")
+                    script.write("#SBATCH --ntasks=1\n")
+                    script.write(f"#SBATCH --cpus-per-task={cpus}\n")
+                    script.write(f"#SBATCH --time={time}\n")
+                    script.write(f"#SBATCH --mail-user={email}\n")
+                    script.write("#SBATCH --mail-type=FAIL\n")
+                    script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
+                    script.write("\n")
+                    script.write(f"cd {batch_dir}\n")
+                    script.write("\n")
+                    script.write(fastp_command)
+                
+                os.chmod(job_script_path, 0o755)
+                logging.info(f"Created paired-end fastp job script: {job_script_path}")
             
-            for filename in filenames:
-                if "R1" in filename:
-                    filesR1.append(filename)
-                elif "R2" in filename:
-                    filesR2.append(filename)
-            
-            # Ensure filesR1 and filesR2 are sorted so paired files match up
-            filesR1.sort()
-            filesR2.sort()
-            
-            if len(filesR1) != len(filesR2):
-                logging.warning(f"Warning: Number of R1 files ({len(filesR1)}) does not match number of R2 files ({len(filesR2)}) in {batch_dir}")
-            
-            for i in range(len(filesR1)):
-                if i < len(filesR2):  # Make sure we have a matching R2 file
-                    r1_file = filesR1[i]
-                    r2_file = filesR2[i]
-                    
-                    out1 = r1_file.replace(".gz", "_preprocessed.fastq.gz")
-                    out2 = r2_file.replace(".gz", "_preprocessed.fastq.gz")
-                    name = r1_file.replace("_R1_001", "")
-                    
-                    fastp_command = (f"{fastp_path} -w {cpus} --correction -i {r1_file} -o {output_dir}/{out1} "
-                                    f"-I {r2_file} -O {output_dir}/{out2} -3 --complexity_threshold=20 "
-                                    f"--length_required=50 --cut_window_size=3 --cut_mean_quality=30")
-                    
-                    job_script_path = os.path.join(job_dir, f"fastp_in_batch_{name}_job.sh")
-                    
-                    with open(job_script_path, "w") as script:
-                        script.write("#!/bin/bash\n")
-                        script.write(f"#SBATCH --job-name=fastp_in_batch_{name}_job\n")
-                        script.write(f"#SBATCH --output=fastp_in_batch_{name}_output\n")
-                        script.write(f"#SBATCH --partition={partition}\n")
-                        script.write("#SBATCH --nodes=1\n")
-                        script.write("#SBATCH --ntasks=1\n")
-                        script.write(f"#SBATCH --cpus-per-task={cpus}\n")
-                        script.write(f"#SBATCH --time={time}\n")
-                        script.write(f"#SBATCH --mail-user={email}\n")
-                        script.write("#SBATCH --mail-type=FAIL\n")
-                        script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
-                        script.write("\n")
-                        script.write(f"cd {batch_dir}\n")
-                        script.write("\n")
-                        script.write(fastp_command)
-                    
-                    os.chmod(job_script_path, 0o755)
-                    logging.info(f"Created fastp job script: {job_script_path}")
-        
+            # Process single-end files
+            for single_file in file_types['single_files']:
+                # Extract a meaningful name for the job
+                sample_id = single_file.split('.')[0]  # Assumes format like 1192c.fq.gz
+                
+                out_file = single_file.replace(".gz", "_preprocessed.fastq.gz")
+                
+                # Generate single-end fastp command (note: no -I or -O parameters)
+                fastp_command = (f"{fastp_path} -w {cpus} -i {single_file} -o {output_dir}/{out_file} "
+                                f"-3 --complexity_threshold=20 --length_required=50 "
+                                f"--cut_window_size=3 --cut_mean_quality=30")
+                
+                job_script_path = os.path.join(job_dir, f"fastp_single_{sample_id}_job.sh")
+                
+                with open(job_script_path, "w") as script:
+                    script.write("#!/bin/bash\n")
+                    script.write(f"#SBATCH --job-name=fastp_single_{sample_id}_job\n")
+                    script.write(f"#SBATCH --output=fastp_single_{sample_id}_output\n")
+                    script.write(f"#SBATCH --partition={partition}\n")
+                    script.write("#SBATCH --nodes=1\n")
+                    script.write("#SBATCH --ntasks=1\n")
+                    script.write(f"#SBATCH --cpus-per-task={cpus}\n")
+                    script.write(f"#SBATCH --time={time}\n")
+                    script.write(f"#SBATCH --mail-user={email}\n")
+                    script.write("#SBATCH --mail-type=FAIL\n")
+                    script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
+                    script.write("\n")
+                    script.write(f"cd {batch_dir}\n")
+                    script.write("\n")
+                    script.write(fastp_command)
+                
+                os.chmod(job_script_path, 0o755)
+                logging.info(f"Created single-end fastp job script: {job_script_path}")
+                
         except FileNotFoundError:
             logging.error(f"Directory not found: {batch_dir}")
         except Exception as e:

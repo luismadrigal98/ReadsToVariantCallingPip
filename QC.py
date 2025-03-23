@@ -130,93 +130,72 @@ def main():
                         mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
     
     elif args.command == "workflow":
+    # Verify directory counts match
         if len(args.input_dirs) != len(args.split_dirs) or len(args.input_dirs) != len(args.fastp_dirs) or len(args.input_dirs) != len(args.job_dirs):
             logging.error("Error: Number of directories must match across all arguments")
             sys.exit(1)
         
+        # STEP 1: Split files
         logging.info("=== STEP 1: Generating split jobs ===")
         generate_split_jobs(args.input_dirs, args.split_dirs, args.job_dirs, lines=args.lines,
                         partition=args.partition, time=args.time, email=args.email, 
                         mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
-        logging.info("\n=== STEP 2: Generating compression jobs ===")
-        generate_compress_jobs(args.split_dirs, args.job_dirs, partition=args.partition,
-                            time=args.time, email=args.email, mem_per_cpu=args.mem_per_cpu,
-                            cpus=args.cpus)
-        
-        logging.info("\n=== STEP 3: Generating fastp jobs ===")
-        generate_fastp_jobs(args.split_dirs, args.fastp_dirs, args.job_dirs, fastp_path=args.fastp_path,
-                        fastp_control_param=args.fastp_control_param,
-                        partition=args.partition, time=args.time, email=args.email,
-                        mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
-        
-        logging.info("\nWorkflow job generation complete. Submit jobs in order:")
-        logging.info("1. Run split jobs")
-        logging.info("2. Run compression jobs")
-        logging.info("3. Run fastp jobs")
-
         if args.submit:
-            logging.info("\nSubmitting jobs automatically...")
-            
-            # Loop through each job directory and submit jobs in sequence
+            # Submit split jobs and wait for completion
+            logging.info("\n=== Submitting split jobs ===")
             for job_dir in args.job_dirs:
-                # Step 1: Submit split jobs
-                logging.info(f"\n=== Submitting split jobs from {job_dir} ===")
                 split_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir) 
                             if f.startswith("Split_") and f.endswith(".sh")]
-                
-                if not split_jobs:
-                    logging.warning(f"No split jobs found in {job_dir}")
-                    continue
                 
                 split_job_ids = submit_jobs_with_limit(split_jobs, args.max_jobs)
                 logging.info(f"Submitted {len(split_job_ids)} split jobs from {job_dir}")
                 
                 # Wait for split jobs to complete
                 logging.info(f"Waiting for split jobs to complete...")
-                wait_success = wait_for_jobs_to_complete(
+                wait_for_jobs_to_complete(
                     job_ids=split_job_ids,
                     check_interval=args.check_interval,
                     max_wait_time=args.max_wait_time
                 )
-                
-                if not wait_success:
-                    logging.error(f"Timed out waiting for split jobs in {job_dir}. Skipping next steps.")
-                    continue
-                
-                # Step 2: Submit compression jobs
-                logging.info(f"\n=== Submitting compression jobs from {job_dir} ===")
+        
+        # STEP 2: Generate compression jobs AFTER split is done
+        logging.info("\n=== STEP 2: Generating compression jobs ===")
+        generate_compress_jobs(args.split_dirs, args.job_dirs, partition=args.partition,
+                            time=args.time, email=args.email, mem_per_cpu=args.mem_per_cpu,
+                            cpus=args.cpus)
+        
+        if args.submit:
+            # Submit compression jobs and wait for completion
+            logging.info("\n=== Submitting compression jobs ===")
+            for job_dir in args.job_dirs:
                 compress_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir) 
                                 if f.startswith("gzip_in_batch_") and f.endswith("_compress_job.sh")]
-                
-                if not compress_jobs:
-                    logging.warning(f"No compression jobs found in {job_dir}")
-                    continue
                 
                 compress_job_ids = submit_jobs_with_limit(compress_jobs, args.max_jobs)
                 logging.info(f"Submitted {len(compress_job_ids)} compression jobs from {job_dir}")
                 
                 # Wait for compression jobs to complete
                 logging.info(f"Waiting for compression jobs to complete...")
-                wait_success = wait_for_jobs_to_complete(
+                wait_for_jobs_to_complete(
                     job_ids=compress_job_ids,
                     check_interval=args.check_interval,
                     max_wait_time=args.max_wait_time
                 )
-                
-                if not wait_success:
-                    logging.error(f"Timed out waiting for compression jobs in {job_dir}. Skipping next steps.")
-                    continue
-                
-                # Step 3: Submit fastp jobs
-                logging.info(f"\n=== Submitting fastp jobs from {job_dir} ===")
-                # Change to:
+        
+        # STEP 3: Generate fastp jobs AFTER compression is done
+        logging.info("\n=== STEP 3: Generating fastp jobs ===")
+        generate_fastp_jobs(args.split_dirs, args.fastp_dirs, args.job_dirs, fastp_path=args.fastp_path,
+                        fastp_control_param=args.fastp_control_param,
+                        partition=args.partition, time=args.time, email=args.email,
+                        mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
+        
+        if args.submit:
+            # Submit fastp jobs
+            logging.info("\n=== Submitting fastp jobs ===")
+            for job_dir in args.job_dirs:
                 fastp_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir) 
-                                if (f.startswith("fastp_paired_") or f.startswith("fastp_single_")) and f.endswith(".sh")]
-                
-                if not fastp_jobs:
-                    logging.warning(f"No fastp jobs found in {job_dir}")
-                    continue
+                            if (f.startswith("fastp_paired_") or f.startswith("fastp_single_")) and f.endswith(".sh")]
                 
                 fastp_job_ids = submit_jobs_with_limit(fastp_jobs, args.max_jobs)
                 logging.info(f"Submitted {len(fastp_job_ids)} fastp jobs from {job_dir}")
@@ -230,6 +209,11 @@ def main():
                 )
             
             logging.info("\nAll jobs have been submitted and completed!")
+        else:
+            logging.info("\nWorkflow job generation complete. Submit jobs in order:")
+            logging.info("1. Run split jobs")
+            logging.info("2. Run compression jobs")
+            logging.info("3. Run fastp jobs")
 
     else:
         parser.print_help()

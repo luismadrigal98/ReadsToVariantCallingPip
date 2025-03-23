@@ -26,7 +26,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 
 # Import the fastq utilities module
-from fastq.utilities import *
+from fastq_utilities import *
 
 def get_job_count(user=None):
     """Get the number of jobs in the SLURM queue for a specific user."""

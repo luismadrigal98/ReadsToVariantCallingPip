@@ -60,9 +60,17 @@ def submit_jobs_with_limit(job_files, max_jobs=4900, sleep_time=60):
         # Submit the job
         try:
             output = subprocess.check_output(f"sbatch {job_file}", shell=True).decode().strip()
-            job_id = output.split()[-1]  # Extract job ID from sbatch output
-            submitted_job_ids.append(job_id)
-            logging.info(f"Submitted job {job_id} from {job_file}")
+            # More robust job ID extraction
+            if "Submitted batch job" in output:
+                job_id = output.split()[-1]
+                # Verify it's a number
+                if job_id.isdigit():
+                    submitted_job_ids.append(job_id)
+                    logging.info(f"Submitted job {job_id} from {job_file}")
+                else:
+                    logging.warning(f"Could not extract job ID from output: {output}")
+            else:
+                logging.warning(f"Unexpected sbatch output: {output}")
             
             # Small delay to avoid overwhelming the scheduler
             time.sleep(0.5)

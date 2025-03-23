@@ -109,7 +109,7 @@ def generate_split_jobs(input_dirs, output_dirs, job_dirs, lines=4000000, partit
                 with open(job_script_path, "w") as script:
                     script.write("#!/bin/bash\n")
                     script.write(f"#SBATCH --job-name=split_{name}job\n")
-                    script.write(f"#SBATCH --output=split_{name}output\n")
+                    script.write(f"#SBATCH --output={job_dir}/split_{name}output\n")
                     script.write(f"#SBATCH --partition={partition}\n")
                     script.write("#SBATCH --nodes=1\n")
                     script.write("#SBATCH --ntasks=1\n")
@@ -164,7 +164,7 @@ def generate_compress_jobs(batch_dirs, job_dirs, partition="sixhour",
                 with open(job_script_path, "w") as script:
                     script.write("#!/bin/bash\n")
                     script.write(f"#SBATCH --job-name=gzip_in_batch_{locator}_job\n")
-                    script.write(f"#SBATCH --output=gzip_in_batch_{locator}_output\n")
+                    script.write(f"#SBATCH --output={job_dir}/gzip_in_batch_{locator}_output\n")
                     script.write(f"#SBATCH --partition={partition}\n")
                     script.write("#SBATCH --nodes=1\n")
                     script.write("#SBATCH --ntasks=1\n")
@@ -234,7 +234,7 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l33
                 with open(job_script_path, "w") as script:
                     script.write("#!/bin/bash\n")
                     script.write(f"#SBATCH --job-name=fastp_paired_{sample_id}_job\n")
-                    script.write(f"#SBATCH --output=fastp_paired_{sample_id}_output\n")
+                    script.write(f"#SBATCH --output={job_dir}/fastp_paired_{sample_id}_output\n")
                     script.write(f"#SBATCH --partition={partition}\n")
                     script.write("#SBATCH --nodes=1\n")
                     script.write("#SBATCH --ntasks=1\n")
@@ -267,7 +267,7 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l33
                 with open(job_script_path, "w") as script:
                     script.write("#!/bin/bash\n")
                     script.write(f"#SBATCH --job-name=fastp_single_{sample_id}_job\n")
-                    script.write(f"#SBATCH --output=fastp_single_{sample_id}_output\n")
+                    script.write(f"#SBATCH --output={job_dir}/fastp_single_{sample_id}_output\n")
                     script.write(f"#SBATCH --partition={partition}\n")
                     script.write("#SBATCH --nodes=1\n")
                     script.write("#SBATCH --ntasks=1\n")

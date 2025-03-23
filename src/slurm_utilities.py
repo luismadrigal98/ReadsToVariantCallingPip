@@ -21,6 +21,7 @@ high-performance computing (HPC) clusters.
 
 import subprocess
 import time
+import logging
 
 def get_job_count(user=None):
     """Get the number of jobs in the SLURM queue for a specific user."""

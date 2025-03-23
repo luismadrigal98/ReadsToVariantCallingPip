@@ -187,7 +187,7 @@ def main():
                 # Step 2: Submit compression jobs
                 logging.info(f"\n=== Submitting compression jobs from {job_dir} ===")
                 compress_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir) 
-                                if f.startswith("gzip_in_batch_") and f.endswith(".sh")]
+                                if f.startswith("gzip_in_batch_") and f.endswith("_compress_job.sh")]
                 
                 if not compress_jobs:
                     logging.warning(f"No compression jobs found in {job_dir}")
@@ -210,8 +210,9 @@ def main():
                 
                 # Step 3: Submit fastp jobs
                 logging.info(f"\n=== Submitting fastp jobs from {job_dir} ===")
+                # Change to:
                 fastp_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir) 
-                            if f.startswith("fastp_in_batch_") and f.endswith(".sh")]
+                                if (f.startswith("fastp_paired_") or f.startswith("fastp_single_")) and f.endswith(".sh")]
                 
                 if not fastp_jobs:
                     logging.warning(f"No fastp jobs found in {job_dir}")

@@ -105,7 +105,7 @@ def wait_for_jobs_to_complete(job_ids=None, job_name_pattern=None, check_interva
             # Check if any of the specific job IDs are still running
             running_jobs = []
             for job_id in job_ids:
-                cmd = f"squeue -j {job_id} -u {user} -h"
+                cmd = f"squeue -j {job_id} -u {user} -h 2>/dev/null"
                 try:
                     output = subprocess.check_output(cmd, shell=True).decode().strip()
                     if output:  # If there's output, the job is still running

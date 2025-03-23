@@ -153,6 +153,9 @@ def generate_compress_jobs(batch_dirs, job_dirs, partition="sixhour",
         
         try:
             filenames = os.listdir(batch_dir)
+
+            if not filenames:
+                logging.warning(f"No files found in {batch_dir} - this is expected when not using --submit")
             
             # Get unique filename roots by removing the last part (usually aa, ab, ac, etc.)
             filenames_shortened = [name[:-3] for name in filenames if len(name) > 3]

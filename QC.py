@@ -71,11 +71,9 @@ def main():
                             help="Directories for job scripts")
     fastp_parser.add_argument("--fastp-path", type=str, default="/home/l338m483/fastp",
                             help="Path to fastp executable")
-    fastp_parser.add_argument("--fastp_control_param", type=str, 
-                            default="-3 --complexity_threshold=20 --length_required=50 --cut_window_size=3 --cut_mean_quality=30",
-                            help="Control parameters common to single and double end reads. Notice that you must provide an unique string separated by spaces. Default is 'fastp'")
-    
-    # Add this code to your main function
+    fastp_parser.add_argument("--fastp-control-param", type=str,  # Change underscore to hyphen
+                        default="-3 --complexity_threshold=20 --length_required=50 --cut_window_size=3 --cut_mean_quality=30",
+                        help="Control parameters common to single and double end reads. Notice that you must provide an unique string separated by spaces.")
 
     # Workflow command (runs all steps)
     workflow_parser = subparsers.add_parser("workflow", parents=[common_parser], 
@@ -92,6 +90,9 @@ def main():
                             help="Number of lines per split file (default: 4000000)")
     workflow_parser.add_argument("--fastp-path", type=str, default="/home/l338m483/fastp",
                             help="Path to fastp executable")
+    workflow_parser.add_argument("--fastp-control-param", type=str, 
+                            default="-3 --complexity_threshold=20 --length_required=50 --cut_window_size=3 --cut_mean_quality=30",
+                            help="Control parameters common to single and double end reads")
     workflow_parser.add_argument("--submit", action="store_true",
                             help="Automatically submit jobs after generation")
     workflow_parser.add_argument("--max-jobs", type=int, default=5000,

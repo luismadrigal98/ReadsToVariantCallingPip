@@ -23,7 +23,7 @@ import time
 logging.basicConfig(level=logging.INFO)
 
 # Include the source directory in the path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
+sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 
 # Import the fastq utilities module
 from fastq.utilities import *

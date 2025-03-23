@@ -132,8 +132,8 @@ def generate_split_jobs(input_dirs, output_dirs, job_dirs, lines=4000000, partit
 
 
 def generate_compress_jobs(batch_dirs, job_dirs, partition="sixhour", 
-                          time="6:00:00", email="l338m483@ku.edu", 
-                          mem_per_cpu="5g", cpus=10):
+                        time="6:00:00", email="l338m483@ku.edu", 
+                        mem_per_cpu="5g", cpus=10):
     """
     Generate SLURM job scripts to compress split FASTQ files.
     
@@ -188,6 +188,7 @@ def generate_compress_jobs(batch_dirs, job_dirs, partition="sixhour",
 
 
 def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l338m483/fastp",
+                        fastp_options="",
                         partition="sixhour", time="6:00:00", email="l338m483@ku.edu", 
                         mem_per_cpu="5g", cpus=10):
     """
@@ -198,6 +199,7 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l33
     output_dirs (list): List of directories for fastp output
     job_dirs (list): List of directories for job scripts
     fastp_path (str): Path to fastp executable
+    fastp_options (str): Additional options to pass to fastp
     partition (str): SLURM partition to use
     time (str): Time limit for jobs
     email (str): Email for notifications
@@ -225,8 +227,7 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l33
                 
                 # Generate paired-end fastp command
                 fastp_command = (f"{fastp_path} -w {cpus} --correction -i {r1_file} -o {output_dir}/{out1} "
-                                f"-I {r2_file} -O {output_dir}/{out2} -3 --complexity_threshold=20 "
-                                f"--length_required=50 --cut_window_size=3 --cut_mean_quality=30")
+                                f"-I {r2_file} -O {output_dir}/{out2} {fastp_options}")
                 
                 job_script_path = os.path.join(job_dir, f"fastp_paired_{sample_id}_job.sh")
                 
@@ -259,8 +260,7 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l33
                 
                 # Generate single-end fastp command (note: no -I or -O parameters)
                 fastp_command = (f"{fastp_path} -w {cpus} -i {single_file} -o {output_dir}/{out_file} "
-                                f"-3 --complexity_threshold=20 --length_required=50 "
-                                f"--cut_window_size=3 --cut_mean_quality=30")
+                                f"{fastp_options}")
                 
                 job_script_path = os.path.join(job_dir, f"fastp_single_{sample_id}_job.sh")
                 

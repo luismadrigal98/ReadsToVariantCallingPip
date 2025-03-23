@@ -5,6 +5,7 @@ Utilities for working with fastq files.
 
 import os
 import re
+import logging
 
 def create_directory(directory):
     """Create directory if it doesn't exist."""
@@ -77,12 +78,12 @@ def generate_split_jobs(input_dirs, output_dirs, job_dirs, lines=4000000, partit
                     script.write(f"zcat {file} | split -l {lines} - {output_dir}/{name}\n")
                 
                 os.chmod(job_script_path, 0o755)
-                print(f"Created split job script: {job_script_path}")
+                logging.info(f"Created split job script: {job_script_path}")
         
         except FileNotFoundError:
-            print(f"Review the name format of the input files in {input_dir}")
+            logging.error(f"Review the name format of the input files in {input_dir}")
         except Exception as e:
-            print(f"An error occurred: {e}")
+            logging.error(f"An error occurred: {e}")
 
 
 def generate_compress_jobs(batch_dirs, job_dirs, partition="sixhour", 
@@ -133,12 +134,12 @@ def generate_compress_jobs(batch_dirs, job_dirs, partition="sixhour",
                     script.write(f"gzip {locator}*\n")
                 
                 os.chmod(job_script_path, 0o755)
-                print(f"Created compression job script: {job_script_path}")
+                logging.info(f"Created compression job script: {job_script_path}")
         
         except FileNotFoundError:
-            print(f"Directory not found: {batch_dir}")
+            logging.error(f"Directory not found: {batch_dir}")
         except Exception as e:
-            print(f"An error occurred: {e}")
+            logging.error(f"An error occurred: {e}")
 
 
 def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l338m483/fastp",
@@ -181,7 +182,7 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l33
             filesR2.sort()
             
             if len(filesR1) != len(filesR2):
-                print(f"Warning: Number of R1 files ({len(filesR1)}) does not match number of R2 files ({len(filesR2)}) in {batch_dir}")
+                logging.warning(f"Warning: Number of R1 files ({len(filesR1)}) does not match number of R2 files ({len(filesR2)}) in {batch_dir}")
             
             for i in range(len(filesR1)):
                 if i < len(filesR2):  # Make sure we have a matching R2 file
@@ -216,9 +217,9 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l33
                         script.write(fastp_command)
                     
                     os.chmod(job_script_path, 0o755)
-                    print(f"Created fastp job script: {job_script_path}")
+                    logging.info(f"Created fastp job script: {job_script_path}")
         
         except FileNotFoundError:
-            print(f"Directory not found: {batch_dir}")
+            logging.error(f"Directory not found: {batch_dir}")
         except Exception as e:
-            print(f"An error occurred: {e}")
+            logging.error(f"An error occurred: {e}")

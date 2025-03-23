@@ -188,7 +188,7 @@ def generate_compress_jobs(batch_dirs, job_dirs, partition="sixhour",
 
 
 def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l338m483/fastp",
-                        fastp_options="",
+                        fastp_control_param="",
                         partition="sixhour", time="6:00:00", email="l338m483@ku.edu", 
                         mem_per_cpu="5g", cpus=10):
     """
@@ -227,7 +227,7 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l33
                 
                 # Generate paired-end fastp command
                 fastp_command = (f"{fastp_path} -w {cpus} --correction -i {r1_file} -o {output_dir}/{out1} "
-                                f"-I {r2_file} -O {output_dir}/{out2} {fastp_options}")
+                                f"-I {r2_file} -O {output_dir}/{out2} {fastp_control_param}")
                 
                 job_script_path = os.path.join(job_dir, f"fastp_paired_{sample_id}_job.sh")
                 
@@ -260,7 +260,7 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l33
                 
                 # Generate single-end fastp command (note: no -I or -O parameters)
                 fastp_command = (f"{fastp_path} -w {cpus} -i {single_file} -o {output_dir}/{out_file} "
-                                f"{fastp_options}")
+                                f"{fastp_control_param}")
                 
                 job_script_path = os.path.join(job_dir, f"fastp_single_{sample_id}_job.sh")
                 

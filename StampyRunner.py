@@ -95,6 +95,9 @@ def main():
     stampy_parser.add_argument("--stampy-path", default="/home/l338m483/stampy/stampy.py",
                             type=str,
                             help="Path to Stampy executable")
+    stampy_parser.add_argument("--samtools-path", type=str,
+                            default="/kuhpc/sw/conda/latest/envs/bioconda/bin/samtools",
+                            help="Path to samtools executable")
     stampy_parser.add_argument("--stampy-cpus", type=int, default=3,
                             help="Number of CPUs for Stampy (default: 3)")
     
@@ -122,6 +125,9 @@ def main():
                             help="Path to Python 2.7 executable. This is required for Stampy")
     workflow_parser.add_argument("--stampy-path", type=str, default="/home/l338m483/stampy/stampy.py", required=False,
                             help="Path to Stampy executable")
+    workflow_parser.add_argument("--samtools-path", type=str,
+                            default="/kuhpc/sw/conda/latest/envs/bioconda/bin/samtools",
+                            help="Path to samtools executable")
     workflow_parser.add_argument("--stampy-cpus", type=int, default=3,
                             help="Number of CPUs for Stampy (default: 3)")
     
@@ -136,9 +142,18 @@ def main():
 
     # Check if indexed reference files exist
     if args.command == "stampy" or args.command == "workflow":
-        if not os.path.exists(args.reference + ".stidx") or not os.path.exists(args.reference + ".sthash"):
-            logging.warning("WARNING: Stampy reference files not found. The reference is going to be indexed.")
+        # Use normpath to ensure consistent path format
+        ref_base = os.path.normpath(os.path.splitext(args.reference)[0])
+        stidx_file = f"{ref_base}.stidx"
+        sthash_file = f"{ref_base}.sthash"
+        
+        # More robust check with debug info
+        if not os.path.exists(stidx_file) or not os.path.exists(sthash_file):
+            logging.warning(f"WARNING: Stampy reference files not found at {stidx_file} or {sthash_file}")
+            logging.warning("The reference is going to be indexed.")
             index_stampy_reference(args.reference, args.python_2_7_path, args.stampy_path)
+        else:
+            logging.info(f"Using existing Stampy index files: {stidx_file} and {sthash_file}")
 
     # Execute appropriate command
     if args.command == "bwa":
@@ -198,6 +213,7 @@ def main():
         
         generate_stampy_jobs(args.input_dirs, args.output_dirs, args.job_dirs,
                     args.reference, args.python_2_7_path, args.stampy_path,
+                    args.samtools_path,
                     partition=args.partition, time=args.time, email=args.email,
                     mem_per_cpu=args.mem_per_cpu, cpus=args.stampy_cpus)
         
@@ -275,6 +291,7 @@ def main():
         logging.info("\n=== STEP 3: Generating Stampy jobs ===")
         generate_stampy_jobs(args.bam_dirs, args.stampy_dirs, args.job_dirs,
                         args.reference, args.python_2_7_path, args.stampy_path,
+                        args.samtools_path,
                         partition=args.partition, time=args.time, email=args.email,
                         mem_per_cpu=args.mem_per_cpu, cpus=args.stampy_cpus)
         

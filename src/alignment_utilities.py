@@ -289,7 +289,9 @@ def index_stampy_reference(reference_genome, python_2_7_path, stampy_path):
 
 def generate_stampy_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
                         python_2_7_path,
-                        stampy_path, partition="sixhour", time="6:00:00", 
+                        stampy_path, 
+                        samtools_path,
+                        partition="sixhour", time="6:00:00", 
                         email="l338m483@ku.edu", mem_per_cpu="5g", cpus=3):
     """
     Generate SLURM job scripts to run Stampy on sorted BAM files.
@@ -330,7 +332,7 @@ def generate_stampy_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
                 stampy_command = (f"{python_2_7_path} {stampy_path} -t {cpus} --sensitive "
                                 f"-g {ref_base} -h {ref_base} --bamkeepgoodreads "
                                 f"-M {os.path.join(input_dir, bam_file)} | "
-                                f"samtools view -Sb > {os.path.join(output_dir, out_bam)}")
+                                f"{samtools_path} view -Sb > {os.path.join(output_dir, out_bam)}")
                 
                 job_script_path = os.path.join(job_dir, f"stampy_{sample_name}_job.sh")
                 

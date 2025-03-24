@@ -93,6 +93,13 @@ def wait_for_jobs_to_complete(job_ids=None, job_name_pattern=None, check_interva
     Returns:
     bool: True if all jobs completed successfully, False otherwise
     """
+    
+    # Check if there are no jobs to wait for
+    if job_ids is not None and len(job_ids) == 0:
+        logging.info("No jobs to wait for - continuing immediately")
+        return True
+    
+    # Check if job IDs or job name pattern is provided
     if job_ids is None and job_name_pattern is None:
         logging.error("Either job_ids or job_name_pattern must be provided")
         return False

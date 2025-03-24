@@ -197,7 +197,7 @@ def main():
             sys.exit(1)
         
         generate_stampy_jobs(args.input_dirs, args.output_dirs, args.job_dirs,
-                    args.reference, args.stampy_path, args.python_2_7_path,
+                    args.reference, args.python_2_7_path, args.stampy_path,
                     partition=args.partition, time=args.time, email=args.email,
                     mem_per_cpu=args.mem_per_cpu, cpus=args.stampy_cpus)
         

@@ -116,7 +116,7 @@ def generate_bwa_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
             # Process paired-end files
             for r1_file, r2_file in file_types['paired_files']:
                 # Extract a meaningful name for the job and output
-                sample_name = r1_file.replace("_R1_001_preprocessed.fastq.gz", "")
+                sample_name = re.sub(r'_R1.*preprocessed\.fastq\.gz', '', r1_file)
                 
                 # Output file name
                 out_sam = f"{sample_name}_bwa-aligned.sam.gz"
@@ -152,7 +152,7 @@ def generate_bwa_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
             # Process single-end files
             for single_file in file_types['single_files']:
                 # Extract a meaningful name for the job and output
-                sample_name = re.sub(r'_R1.*_preprocessed\.fastq\.gz', '', r1_file)
+                sample_name = re.sub(r'_preprocessed\.fastq\.gz', '', single_file)
                 
                 # Output file name
                 out_sam = f"{sample_name}_bwa-aligned.sam.gz"

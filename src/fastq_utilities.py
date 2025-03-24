@@ -22,7 +22,10 @@ def detect_file_type(input_dir):
     Returns:
     dict: Dictionary with lists of paired and single files
     """
-    fastq_files = [f for f in os.listdir(input_dir) if f.endswith(('.fastq.gz', '.fq.gz'))]
+    fastq_files = [f for f in os.listdir(input_dir) if (
+                        f.endswith(('.fastq', '.fq')) or 
+                        (f.endswith('.gz'))
+                        )]
     
     # Initialize result structure
     result = {

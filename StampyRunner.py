@@ -127,6 +127,18 @@ def main():
     # Parse arguments
     args = parser.parse_args()
     
+    # Check if bwa-generated index exists
+    if args.command == "bwa" or args.command == "workflow":
+        if not os.path.exists(args.reference + ".bwt"):
+            logging.warning("WARNING: BWA index not found. The reference is going to be indexed.")
+            index_bwa_reference(args.reference, args.bwa_path)
+
+    # Check if indexed reference files exist
+    if args.command == "stampy" or args.command == "workflow":
+        if not os.path.exists(args.reference + ".stidx") or not os.path.exists(args.reference + ".sthash"):
+            logging.warning("WARNING: Stampy reference files not found. The reference is going to be indexed.")
+            index_stampy_reference(args.reference, args.python_2_7_path, args.stampy_path)
+
     # Execute appropriate command
     if args.command == "bwa":
         if len(args.input_dirs) != len(args.output_dirs) or len(args.input_dirs) != len(args.job_dirs):

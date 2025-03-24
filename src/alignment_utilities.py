@@ -50,6 +50,27 @@ def detect_preprocessed_files(input_dir):
     logging.info(f"Found {len(result['paired_files'])} paired-end file sets and {len(result['single_files'])} single-end files")
     return result
 
+def index_bwa_reference(reference_genome, bwa_path):
+    """
+    Index the reference genome with BWA.
+    
+    Parameters:
+    reference_genome (str): Path to the reference genome (FASTA)
+    bwa_path (str): Path to BWA executable
+    """
+    try:
+        # BWA index command
+        index_command = f"{bwa_path} index {reference_genome}"
+        
+        # Run the command
+        os.system(index_command)
+        logging.info(f"Indexed reference genome with BWA: {reference_genome}")
+        
+    except FileNotFoundError:
+        logging.error(f"File not found: {reference_genome}")
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+
 def detect_bam_files(input_dir):
     """
     Find sorted BAM files for Stampy processing.

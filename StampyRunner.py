@@ -125,9 +125,6 @@ def main():
                             help="Path to Python 2.7 executable. This is required for Stampy")
     workflow_parser.add_argument("--stampy-path", type=str, default="/home/l338m483/stampy/stampy.py", required=False,
                             help="Path to Stampy executable")
-    workflow_parser.add_argument("--samtools-path", type=str,
-                            default="/kuhpc/sw/conda/latest/envs/bioconda/bin/samtools",
-                            help="Path to samtools executable")
     workflow_parser.add_argument("--stampy-cpus", type=int, default=3,
                             help="Number of CPUs for Stampy (default: 3)")
     

@@ -152,7 +152,7 @@ def generate_bwa_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
             # Process single-end files
             for single_file in file_types['single_files']:
                 # Extract a meaningful name for the job and output
-                sample_name = single_file.replace("_preprocessed.fastq.gz", "")
+                sample_name = re.sub(r'_R1.*_preprocessed\.fastq\.gz', '', r1_file)
                 
                 # Output file name
                 out_sam = f"{sample_name}_bwa-aligned.sam.gz"

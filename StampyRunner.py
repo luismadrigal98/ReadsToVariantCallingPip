@@ -25,6 +25,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 from alignment_utilities import *
 from slurm_utilities import *
 
+# Python 2.7 path for Stampy
+default_python=os.path.expanduser("~/.conda/envs/Python2.7/bin/python")
+
 def main():
     parser = argparse.ArgumentParser(description="Alignment pipeline using BWA and Stampy")
     
@@ -62,7 +65,7 @@ def main():
                             help="Directories for job scripts")
     bwa_parser.add_argument("--reference", type=str, required=True,
                             help="Path to the reference genome (indexed with BWA)")
-    bwa_parser.add_argument("--bwa-path", type=str, default="bwa",
+    bwa_parser.add_argument("--bwa-path", type=str, default="/kuhpc/sw/conda/latest/envs/bioconda/bin/bwa",
                             help="Path to BWA executable")
     
     # SAM to BAM command
@@ -73,7 +76,8 @@ def main():
                             help="Directories for sorted BAM output")
     sambam_parser.add_argument("--job-dirs", type=str, nargs="+", required=True,
                             help="Directories for job scripts")
-    sambam_parser.add_argument("--samtools-path", type=str, default="samtools",
+    sambam_parser.add_argument("--samtools-path", type=str, 
+                            default="/kuhpc/sw/conda/latest/envs/bioconda/bin/samtools",
                             help="Path to samtools executable")
     
     # Stampy command
@@ -86,7 +90,10 @@ def main():
                             help="Directories for job scripts")
     stampy_parser.add_argument("--reference", type=str, required=True,
                             help="Path to the reference genome (with .stidx and .sthash)")
-    stampy_parser.add_argument("--stampy-path", type=str, required=True,
+    stampy_parser.add_argument("--python_2.7_path", type=str, default=str(default_python),
+                            help="Path to Python 2.7 executable. This is required for Stampy")
+    stampy_parser.add_argument("--stampy-path", default="/home/l338m483/stampy/stampy.py",
+                            type=str,
                             help="Path to Stampy executable")
     stampy_parser.add_argument("--stampy-cpus", type=int, default=3,
                             help="Number of CPUs for Stampy (default: 3)")
@@ -106,11 +113,13 @@ def main():
                             help="Directories for job scripts")
     workflow_parser.add_argument("--reference", type=str, required=True,
                             help="Path to the reference genome")
-    workflow_parser.add_argument("--bwa-path", type=str, default="bwa",
+    workflow_parser.add_argument("--bwa-path", type=str, default="/kuhpc/sw/conda/latest/envs/bioconda/bin/bwa",
                             help="Path to BWA executable")
-    workflow_parser.add_argument("--samtools-path", type=str, default="samtools",
+    workflow_parser.add_argument("--samtools-path", type=str, default="/kuhpc/sw/conda/latest/envs/bioconda/bin/samtools",
                             help="Path to samtools executable")
-    workflow_parser.add_argument("--stampy-path", type=str, required=True,
+    stampy_parser.add_argument("--python_2.7_path", type=str, default=str(default_python),
+                            help="Path to Python 2.7 executable. This is required for Stampy")
+    workflow_parser.add_argument("--stampy-path", type=str, default="/home/l338m483/stampy/stampy.py", required=False,
                             help="Path to Stampy executable")
     workflow_parser.add_argument("--stampy-cpus", type=int, default=3,
                             help="Number of CPUs for Stampy (default: 3)")
@@ -175,9 +184,9 @@ def main():
             sys.exit(1)
         
         generate_stampy_jobs(args.input_dirs, args.output_dirs, args.job_dirs,
-                            args.reference, args.stampy_path,
-                            partition=args.partition, time=args.time, email=args.email,
-                            mem_per_cpu=args.mem_per_cpu, cpus=args.stampy_cpus)
+                    args.reference, args.stampy_path, python_2_7_path=args.python_2_7_path,
+                    partition=args.partition, time=args.time, email=args.email,
+                    mem_per_cpu=args.mem_per_cpu, cpus=args.stampy_cpus)
         
         if args.submit:
             # Submit Stampy jobs
@@ -252,7 +261,7 @@ def main():
         # STEP 3: Stampy processing
         logging.info("\n=== STEP 3: Generating Stampy jobs ===")
         generate_stampy_jobs(args.bam_dirs, args.stampy_dirs, args.job_dirs,
-                        args.reference, args.stampy_path,
+                        args.reference, args.python_2_7_path, args.stampy_path,
                         partition=args.partition, time=args.time, email=args.email,
                         mem_per_cpu=args.mem_per_cpu, cpus=args.stampy_cpus)
         

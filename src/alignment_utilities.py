@@ -65,7 +65,8 @@ def detect_bam_files(input_dir):
     return bam_files
 
 def generate_bwa_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
-                    bwa_path="bwa", partition="sixhour", time="6:00:00", 
+                    bwa_path="/kuhpc/sw/conda/latest/envs/bioconda/bin/bwa", 
+                    partition="sixhour", time="6:00:00", 
                     email="l338m483@ku.edu", mem_per_cpu="5g", cpus=10):
     """
     Generate SLURM job scripts to run BWA on preprocessed FASTQ files.
@@ -237,6 +238,7 @@ def generate_sam_to_bam_jobs(input_dirs, output_dirs, job_dirs,
             logging.error(f"An error occurred: {e}")
 
 def generate_stampy_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
+                        python_2_7_path,
                         stampy_path, partition="sixhour", time="6:00:00", 
                         email="l338m483@ku.edu", mem_per_cpu="5g", cpus=3):
     """
@@ -247,6 +249,7 @@ def generate_stampy_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
     output_dirs (list): List of directories for Stampy output
     job_dirs (list): List of directories for job scripts
     reference_genome (str): Path to the reference genome (with .stidx and .sthash)
+    python_27_path (str): Path to Python 2.7 executable
     stampy_path (str): Path to Stampy executable
     partition (str): SLURM partition to use
     time (str): Time limit for jobs
@@ -274,7 +277,7 @@ def generate_stampy_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
                 out_bam = f"{sample_name}_stampy.bam"
                 
                 # Stampy command
-                stampy_command = (f"{stampy_path} -t {cpus} --sensitive "
+                stampy_command = (f"{python_2_7_path} {stampy_path} -t {cpus} --sensitive "
                                 f"-g {ref_base} -h {ref_base} --bamkeepgoodreads "
                                 f"-M {os.path.join(input_dir, bam_file)} | "
                                 f"samtools view -Sb > {os.path.join(output_dir, out_bam)}")
@@ -295,7 +298,6 @@ def generate_stampy_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
                     script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
                     script.write("\n")
                     script.write("module load samtools\n")
-                    script.write("module load python/2.7\n")  # Stampy requires Python 2.7
                     script.write(f"cd {input_dir}\n")
                     script.write("\n")
                     script.write(stampy_command)

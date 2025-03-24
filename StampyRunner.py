@@ -90,7 +90,7 @@ def main():
                             help="Directories for job scripts")
     stampy_parser.add_argument("--reference", type=str, required=True,
                             help="Path to the reference genome (with .stidx and .sthash)")
-    stampy_parser.add_argument("--python_2.7_path", type=str, default=str(default_python),
+    stampy_parser.add_argument("--python_2_7_path", type=str, default=str(default_python),
                             help="Path to Python 2.7 executable. This is required for Stampy")
     stampy_parser.add_argument("--stampy-path", default="/home/l338m483/stampy/stampy.py",
                             type=str,
@@ -117,7 +117,8 @@ def main():
                             help="Path to BWA executable")
     workflow_parser.add_argument("--samtools-path", type=str, default="/kuhpc/sw/conda/latest/envs/bioconda/bin/samtools",
                             help="Path to samtools executable")
-    workflow_parser.add_argument("--python_2.7_path", type=str, default=str(default_python),
+    # Make sure this is correct in the workflow parser section
+    workflow_parser.add_argument("--python_2_7_path", type=str, default=str(default_python),
                             help="Path to Python 2.7 executable. This is required for Stampy")
     workflow_parser.add_argument("--stampy-path", type=str, default="/home/l338m483/stampy/stampy.py", required=False,
                             help="Path to Stampy executable")

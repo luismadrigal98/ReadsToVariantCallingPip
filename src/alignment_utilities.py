@@ -237,6 +237,38 @@ def generate_sam_to_bam_jobs(input_dirs, output_dirs, job_dirs,
         except Exception as e:
             logging.error(f"An error occurred: {e}")
 
+def index_stampy_reference(reference_genome, python_2_7_path, stampy_path):
+    """
+    Index the reference genome with Stampy.
+    
+    Parameters:
+    reference_genome (str): Path to the reference genome (FASTA)
+    python_2_7_path (str): Path to Python 2.7 executable
+    stampy_path (str): Path to Stampy executable
+    """
+    try:
+        # Reference name without extension (for Stampy -g -h options)
+        ref_base = os.path.splitext(reference_genome)[0]
+        
+        # Stampy indexing command
+        index_command = f"{python_2_7_path} {stampy_path} -G {ref_base} {reference_genome}"
+        
+        # Run the command
+        os.system(index_command)
+        logging.info(f"Indexed reference genome with Stampy: {reference_genome}")
+
+        # Stampy hash command
+        hash_command = f"{python_2_7_path} {stampy_path} -g {ref_base} -H {ref_base}"
+
+        # Run the command
+        os.system(hash_command)
+        logging.info(f"Hashed reference genome with Stampy: {reference_genome}")
+        
+    except FileNotFoundError:
+        logging.error(f"File not found: {reference_genome}")
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+
 def generate_stampy_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
                         python_2_7_path,
                         stampy_path, partition="sixhour", time="6:00:00", 

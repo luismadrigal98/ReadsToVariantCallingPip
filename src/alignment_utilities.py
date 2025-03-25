@@ -329,11 +329,12 @@ def generate_stampy_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
                 out_bam = f"{sample_name}_stampy.bam"
                 
                 # Stampy command
-                stampy_command = (f"{python_2_7_path} {stampy_path} -t {cpus} --sensitive "
-                                f"-g {ref_base} -h {ref_base} --bamkeepgoodreads "
-                                f"-M {os.path.join(input_dir, bam_file)} | "
-                                f"{samtools_path} view -Sb > {os.path.join(output_dir, out_bam)}")
-                
+                stampy_command = (f"PATH=$(dirname {samtools_path}):$PATH "  # Set PATH in command context
+                                    f"{python_2_7_path} {stampy_path} -t {cpus} --sensitive "
+                                    f"-g {ref_base} -h {ref_base} --bamkeepgoodreads "
+                                    f"-M {os.path.join(input_dir, bam_file)} | "
+                                    f"{samtools_path} view -Sb > {os.path.join(output_dir, out_bam)}")
+
                 job_script_path = os.path.join(job_dir, f"stampy_{sample_name}_job.sh")
                 
                 with open(job_script_path, "w") as script:

@@ -349,6 +349,10 @@ def generate_stampy_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
                     script.write("#SBATCH --mail-type=FAIL\n")
                     script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
                     script.write("\n")
+                    # Add samtools to the path
+                    script.write("# Add samtools to the PATH\n")
+                    script.write(f"export PATH=$(dirname {samtools_path}):$PATH\n")
+                    script.write("\n")
                     script.write(f"cd {input_dir}\n")
                     script.write("\n")
                     script.write(stampy_command)

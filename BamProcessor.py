@@ -84,7 +84,7 @@ def main():
                             help="Directories for job scripts")
     dedup_parser.add_argument("--duplicate-mode", type=str, 
                             choices=["preserve", "mark", "mark_remove"],
-                            default="mark_remove",
+                            default="mark",
                             help="How to handle duplicate reads")
     
     # Command: index
@@ -110,7 +110,7 @@ def main():
                                 default="all", help="Type of BAM files to merge")
     workflow_parser.add_argument("--duplicate-mode", type=str, 
                                 choices=["preserve", "mark", "mark_remove"],
-                                default="mark_remove",
+                                default="mark",
                                 help="How to handle duplicate reads")
     
     # Parse arguments

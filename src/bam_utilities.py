@@ -44,9 +44,9 @@ def detect_bam_files(input_dir, bam_type=None):
     return bam_files
 
 def generate_merge_jobs(input_dirs, output_dirs, job_dirs, 
-                       samtools_path="samtools", bam_type=None,
-                       partition="sixhour", time="6:00:00", 
-                       email="l338m483@ku.edu", mem_per_cpu="5g", cpus=14):
+                        samtools_path="samtools", bam_type=None,
+                        partition="sixhour", time="6:00:00", 
+                        email="l338m483@ku.edu", mem_per_cpu="5g", cpus=14):
     """
     Generate SLURM job scripts to merge and sort BAM files.
     
@@ -127,10 +127,10 @@ def generate_merge_jobs(input_dirs, output_dirs, job_dirs,
             logging.error(f"Error processing directory {input_dir}: {e}")
 
 def generate_duplicate_processing_jobs(input_dirs, output_dirs_base, job_dirs, 
-                                     duplicate_mode="mark_remove", 
-                                     samtools_path="samtools", picard_path="picard",
-                                     partition="sixhour", time="16:00:00", 
-                                     email="l338m483@ku.edu", mem_per_cpu="20g", cpus=5):
+                                        duplicate_mode="mark_remove", 
+                                        samtools_path="samtools", picard_path="picard",
+                                        partition="sixhour", time="16:00:00", 
+                                        email="l338m483@ku.edu", mem_per_cpu="20g", cpus=5):
     """
     Generate SLURM job scripts for BAM duplicate processing and filtering.
     
@@ -200,7 +200,7 @@ def generate_duplicate_processing_jobs(input_dirs, output_dirs_base, job_dirs,
                 name = merged_file.replace("_merged_sorted.bam", config["name_suffix"])
                 out_1 = merged_file.replace("_merged_sorted.bam", f"{config['name_suffix']}_processed_merged_sorted.bam")
                 out_2 = out_1.replace(f"{config['name_suffix']}_processed_merged_sorted.bam", 
-                                     f"{config['name_suffix']}_filtered_merged_sorted.bam")
+                                        f"{config['name_suffix']}_filtered_merged_sorted.bam")
                 
                 # Create the commands
                 if config["picard_cmd"] is None:
@@ -248,8 +248,8 @@ def generate_duplicate_processing_jobs(input_dirs, output_dirs_base, job_dirs,
             logging.error(f"Error processing directory {input_dir}: {e}")
 
 def generate_indexing_jobs(input_dirs, job_dirs, samtools_path="samtools", picard_path="picard",
-                         partition="sixhour", time="16:00:00", 
-                         email="l338m483@ku.edu", mem_per_cpu="5g", cpus=10):
+                            partition="sixhour", time="16:00:00", 
+                            email="l338m483@ku.edu", mem_per_cpu="5g", cpus=10):
     """
     Generate SLURM job scripts to create indexes for BAM files.
     

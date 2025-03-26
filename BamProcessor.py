@@ -138,7 +138,7 @@ def main():
                     if f.endswith("_merge_and_sort_bam_job.sh")
                 ])
             
-            merge_job_ids = submit_jobs(merge_jobs, args.max_jobs)
+            merge_job_ids = submit_jobs_with_limit(merge_jobs, args.max_jobs)
             
             if merge_job_ids:
                 logging.info("Waiting for merge jobs to complete...")
@@ -225,7 +225,7 @@ def main():
                     if f.endswith("_merge_and_sort_bam_job.sh")
                 ])
             
-            merge_job_ids = submit_jobs(merge_jobs, args.max_jobs)
+            merge_job_ids = submit_jobs_with_limit(merge_jobs, args.max_jobs)
             
             if merge_job_ids:
                 logging.info("Waiting for merge jobs to complete...")
@@ -248,7 +248,7 @@ def main():
                     if f.endswith("_job.sh") and "indexing" in f
                 ])
             
-            index_job_ids = submit_jobs(index_jobs, args.max_jobs)
+            index_job_ids = submit_jobs_with_limit(merge_jobs, args.max_jobs)
             
             if index_job_ids:
                 logging.info("Waiting for indexing jobs to complete...")
@@ -272,7 +272,7 @@ def main():
                     if f.endswith("_duplicate_processing_job.sh")
                 ])
             
-            dedup_job_ids = submit_jobs(dedup_jobs, args.max_jobs)
+            dedup_job_ids = submit_jobs_with_limit(dedup_jobs, args.max_jobs)
             
             if dedup_job_ids:
                 logging.info("Waiting for duplicate processing jobs to complete...")
@@ -323,7 +323,7 @@ def main():
                 ]
                 index_jobs.extend(new_index_jobs)
             
-            index_job_ids = submit_jobs(index_jobs, args.max_jobs)
+            index_job_ids = submit_jobs_with_limit(index_jobs, args.max_jobs)
             
             if index_job_ids:
                 logging.info("Waiting for indexing jobs to complete...")

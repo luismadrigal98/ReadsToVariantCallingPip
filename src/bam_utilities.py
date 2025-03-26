@@ -48,7 +48,7 @@ def generate_merge_jobs(input_dirs, output_dirs, job_dirs,
                         partition="sixhour", time="6:00:00", 
                         email="l338m483@ku.edu", mem_per_cpu="5g", cpus=14):
     """
-    Generate SLURM job scripts to merge and sort BAM files.
+    Generate SLURM job scripts to merge and sort BAM files by sample.
     
     Parameters:
     input_dirs (list): List of directories containing BAM files
@@ -69,60 +69,92 @@ def generate_merge_jobs(input_dirs, output_dirs, job_dirs,
         
         try:
             # Get all BAM files
-            bam_files = detect_bam_files(input_dir, bam_type)
+            all_bam_files = detect_bam_files(input_dir, bam_type)
             
-            if not bam_files:
+            if not all_bam_files:
                 logging.warning(f"No {bam_type or 'BAM'} files found in {input_dir}")
                 continue
+            
+            # Group BAM files by sample name
+            sample_groups = {}
+            for bam_file in all_bam_files:
+                # Extract sample name using several patterns
+                sample_name = None
                 
-            # Determine the output file name based on the first input file
-            if bam_type == 'bwa' or (bam_type is None and 'bwa' in bam_files[0]):
-                out = re.sub(r"_L[0-9]{3}_SET[0-9]_[a-z]{2}_bwa-sorted\.bam", "_bwa_merged.bam", bam_files[0])
-                name = re.sub(r"_L[0-9]{3}_SET[0-9]_[a-z]{2}_bwa-sorted\.bam", "_bwa", bam_files[0])
-            elif bam_type == 'stampy' or (bam_type is None and 'stampy' in bam_files[0]):
-                out = re.sub(r"_L[0-9]{3}_SET[0-9]_[a-z]{2}_stampy\.bam", "_stampy_merged.bam", bam_files[0])
-                name = re.sub(r"_L[0-9]{3}_SET[0-9]_[a-z]{2}_stampy\.bam", "_stampy", bam_files[0])
-            else:
-                # Generic fallback for other naming patterns
-                out = f"{Path(input_dir).name}_merged.bam"
-                name = f"{Path(input_dir).name}"
+                # Pattern 1: Numbers and letters before "_S" or "_L"
+                match = re.match(r'^(\d+[a-zA-Z]?(?:_[a-zA-Z]+)?)', bam_file)
+                if match:
+                    sample_name = match.group(1)
+                # Pattern 2: Just take the part before first underscore
+                else:
+                    parts = bam_file.split('_')
+                    if parts:
+                        sample_name = parts[0]
+                
+                # If we can't determine sample name, use the filename
+                if not sample_name:
+                    sample_name = bam_file.split('.')[0]
+                
+                # Add to proper group
+                if sample_name not in sample_groups:
+                    sample_groups[sample_name] = []
+                sample_groups[sample_name].append(bam_file)
             
-            # Full paths to files
-            output_merged = os.path.join(output_dir, out)
-            output_sorted = os.path.join(output_dir, out.replace('.bam', '_sorted.bam'))
+            logging.info(f"Found {len(sample_groups)} sample groups to merge")
             
-            # Create commands
-            bam_paths = ' '.join([os.path.join(input_dir, f) for f in bam_files])
-            merging_command = f"{samtools_path} merge -@ {cpus} -o {output_merged} {bam_paths}"
-            sorting_command = f"{samtools_path} sort -@ {cpus} -o {output_sorted} {output_merged}"
-            
-            # Create job script
-            job_script_path = os.path.join(job_dir, f"{name}_merge_and_sort_bam_job.sh")
-            
-            with open(job_script_path, "w") as script:
-                script.write("#!/bin/bash\n")
-                script.write(f"#SBATCH --job-name=merge_{name}_job\n")
-                script.write(f"#SBATCH --output={os.path.join(job_dir, f'merge_{name}_output')}\n")
-                script.write(f"#SBATCH --partition={partition}\n")
-                script.write("#SBATCH --nodes=1\n")
-                script.write("#SBATCH --ntasks=1\n")
-                script.write(f"#SBATCH --cpus-per-task={cpus}\n")
-                script.write(f"#SBATCH --time={time}\n")
-                script.write(f"#SBATCH --mail-user={email}\n")
-                script.write("#SBATCH --mail-type=END,FAIL\n")
-                script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
-                script.write("\n")
-                script.write("# Ensure samtools is in PATH\n")
-                script.write(f"export PATH=$(dirname {samtools_path}):$PATH\n")
-                script.write(f"cd {input_dir}\n")
-                script.write("\n")
-                script.write(f"{merging_command}\n")
-                script.write("\n")
-                script.write(f"{sorting_command}\n")
-            
-            os.chmod(job_script_path, 0o755)
-            logging.info(f"Created merge job script: {job_script_path}")
-            
+            # Process each sample group
+            for sample_name, sample_files in sample_groups.items():
+                # Skip groups with only one file if desired
+                if len(sample_files) == 1:
+                    logging.info(f"Sample {sample_name} has only one BAM file, will be processed without merging")
+                    
+                # Determine output file name
+                if bam_type == 'bwa' or (bam_type is None and any('bwa' in f for f in sample_files)):
+                    out = f"{sample_name}_bwa_merged.bam"
+                    job_name = f"{sample_name}_bwa"
+                elif bam_type == 'stampy' or (bam_type is None and any('stampy' in f for f in sample_files)):
+                    out = f"{sample_name}_stampy_merged.bam"
+                    job_name = f"{sample_name}_stampy" 
+                else:
+                    out = f"{sample_name}_merged.bam"
+                    job_name = f"{sample_name}"
+                
+                # Full paths to files
+                output_merged = os.path.join(output_dir, out)
+                output_sorted = os.path.join(output_dir, out.replace('.bam', '_sorted.bam'))
+                
+                # Create commands
+                bam_paths = ' '.join([os.path.join(input_dir, f) for f in sample_files])
+                merging_command = f"{samtools_path} merge -@ {cpus} -o {output_merged} {bam_paths}"
+                sorting_command = f"{samtools_path} sort -@ {cpus} -o {output_sorted} {output_merged}"
+                
+                # Create job script
+                job_script_path = os.path.join(job_dir, f"{job_name}_merge_and_sort_bam_job.sh")
+                
+                with open(job_script_path, "w") as script:
+                    script.write("#!/bin/bash\n")
+                    script.write(f"#SBATCH --job-name=merge_{job_name}_job\n")
+                    script.write(f"#SBATCH --output={os.path.join(job_dir, f'merge_{job_name}_output')}\n")
+                    script.write(f"#SBATCH --partition={partition}\n")
+                    script.write("#SBATCH --nodes=1\n")
+                    script.write("#SBATCH --ntasks=1\n")
+                    script.write(f"#SBATCH --cpus-per-task={cpus}\n")
+                    script.write(f"#SBATCH --time={time}\n")
+                    script.write(f"#SBATCH --mail-user={email}\n")
+                    script.write("#SBATCH --mail-type=END,FAIL\n")
+                    script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
+                    script.write("\n")
+                    script.write("# Ensure samtools is in PATH\n")
+                    script.write(f"export PATH=$(dirname {samtools_path}):$PATH\n")
+                    script.write(f"cd {input_dir}\n")
+                    script.write("\n")
+                    script.write(f"{merging_command}\n")
+                    script.write("\n")
+                    script.write(f"{sorting_command}\n")
+                
+                os.chmod(job_script_path, 0o755)
+                logging.info(f"Created merge job script for sample {sample_name} with {len(sample_files)} files: {job_script_path}")
+                
         except Exception as e:
             logging.error(f"Error processing directory {input_dir}: {e}")
 

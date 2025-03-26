@@ -78,14 +78,17 @@ def generate_merge_jobs(input_dirs, output_dirs, job_dirs,
             # Group BAM files by sample name
             sample_groups = {}
             for bam_file in all_bam_files:
-                # Extract sample name using several patterns
+                # Extract the core sample name
                 sample_name = None
                 
-                # Pattern 1: Numbers and letters before "_S" or "_L"
-                match = re.match(r'^(\d+[a-zA-Z]?(?:_[a-zA-Z]+)?)', bam_file)
+                # Pattern 1: Common format like "1192c_ai_stampy.bam" - get just "1192c"
+                match = re.match(r'^(\d+[a-zA-Z]?)(?:_[a-z]{2})?', bam_file)
                 if match:
                     sample_name = match.group(1)
-                # Pattern 2: Just take the part before first underscore
+                # Pattern 2: Handle S-number format like "17_S1_L001_R1_001"
+                elif re.match(r'^(\d+)_S\d+', bam_file):
+                    sample_name = re.match(r'^(\d+)_S\d+', bam_file).group(1)
+                # Pattern 3: Fallback to first segment before underscore
                 else:
                     parts = bam_file.split('_')
                     if parts:

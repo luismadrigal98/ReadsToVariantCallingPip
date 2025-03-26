@@ -58,7 +58,7 @@ def main():
                             default="/kuhpc/sw/conda/latest/envs/bioconda/bin/samtools",
                             help="Path to samtools executable")
     common_parser.add_argument("--picard-path", type=str, 
-                            default="picard",
+                            default="~/.conda/envs/Python2.7/bin/picard",
                             help="Path to picard executable")
     
     # Command: merge

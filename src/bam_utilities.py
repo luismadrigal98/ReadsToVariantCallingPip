@@ -111,6 +111,9 @@ def generate_merge_jobs(input_dirs, output_dirs, job_dirs,
                 if len(sample_files) == 1:
                     logging.info(f"Sample {sample_name} has only one BAM file, will be processed without merging")
                     
+                # Sort files for consistent command generation
+                sample_files.sort()
+
                 # Determine output file name
                 if bam_type == 'bwa' or (bam_type is None and any('bwa' in f for f in sample_files)):
                     out = f"{sample_name}_bwa_merged.bam"

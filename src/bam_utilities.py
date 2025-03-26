@@ -166,12 +166,7 @@ def generate_duplicate_processing_jobs(input_dirs, output_dirs_base, job_dirs,
         }
     }
     
-    # Ensure the requested mode is valid
-    if duplicate_mode not in mode_configs:
-        logging.error(f"Invalid duplicate mode: {duplicate_mode}. Must be one of {list(mode_configs.keys())}")
-        return
-    
-    # Get the configuration for the selected mode
+    # Get config for selected mode
     config = mode_configs[duplicate_mode]
     
     for input_dir, output_dir_base, job_dir in zip(input_dirs, output_dirs_base, job_dirs):
@@ -186,7 +181,7 @@ def generate_duplicate_processing_jobs(input_dirs, output_dirs_base, job_dirs,
                 continue
             
             for merged_file in merged_files:
-                # Determine if this is BWA or Stampy
+                # Create output directory based on file type
                 if 'bwa' in merged_file:
                     output_dir = os.path.join(output_dir_base, config["dir_suffix"], "bwa")
                 elif 'stampy' in merged_file:
@@ -194,6 +189,7 @@ def generate_duplicate_processing_jobs(input_dirs, output_dirs_base, job_dirs,
                 else:
                     output_dir = os.path.join(output_dir_base, config["dir_suffix"], "other")
                 
+                # Create the directory structure
                 create_directory(output_dir)
                 
                 # Generate output file names

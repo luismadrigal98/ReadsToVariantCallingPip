@@ -282,6 +282,8 @@ def main():
         
         logging.info("=== STEP 4: Indexing processed BAM files ===")
         # Collect all processed output directories
+        logging.info("=== STEP 4: Indexing processed BAM files ===")
+        # Collect all processed output directories that actually exist
         processed_dirs = []
         for base_dir in args.processed_dirs_base:
             if args.duplicate_mode == "preserve":
@@ -291,10 +293,20 @@ def main():
             else:
                 suffix = "Pipeline.without.duplicates"
             
+            # Only add directories that actually exist
             if bam_type is None or bam_type == "bwa":
-                processed_dirs.append(os.path.join(base_dir, suffix, "bwa"))
+                bwa_dir = os.path.join(base_dir, suffix, "bwa")
+                if os.path.exists(bwa_dir):
+                    processed_dirs.append(bwa_dir)
+                else:
+                    logging.warning(f"Skipping non-existent directory: {bwa_dir}")
+            
             if bam_type is None or bam_type == "stampy":
-                processed_dirs.append(os.path.join(base_dir, suffix, "stampy"))
+                stampy_dir = os.path.join(base_dir, suffix, "stampy")
+                if os.path.exists(stampy_dir):
+                    processed_dirs.append(stampy_dir)
+                else:
+                    logging.warning(f"Skipping non-existent directory: {stampy_dir}")
         
         generate_indexing_jobs(processed_dirs, args.job_dirs,
                                 samtools_path=args.samtools_path, picard_path=args.picard_path,

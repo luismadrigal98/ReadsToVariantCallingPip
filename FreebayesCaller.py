@@ -93,6 +93,7 @@ def main():
                 fai_path=args.fai,
                 window_size=args.window_size,
                 variant_caller=args.variant_caller,
+                caller_path=args.variant_caller_path,
                 partition=args.partition,
                 time=args.time,
                 email=args.email,

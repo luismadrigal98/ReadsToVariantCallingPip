@@ -61,6 +61,7 @@ def detect_bam_files(input_dir, bam_type=None, suffix="_filtered_merged_sorted.b
 def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs, 
                                 regions, reference_fasta, fai_path,
                                 window_size=1000000, variant_caller="freebayes",
+                                caller_path='~/.conda/envs/Python2.7/bin/freebayes',
                                 partition="sixhour", time="6:00:00",
                                 email="l338m483@ku.edu", mem_per_cpu="30g",
                                 caller_params=None):
@@ -76,6 +77,7 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
     fai_path (str): Path to FASTA index file
     window_size (int): Window size for chunking variant calling
     variant_caller (str): Variant caller to use ('freebayes', 'bcftools', etc.)
+    caller_path (str): Path to variant caller executable
     partition (str): SLURM partition
     time (str): Job time limit
     email (str): Notification email
@@ -150,11 +152,11 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
                     bam_path = os.path.join(input_dir, bam_file)
                     
                     if variant_caller == "freebayes":
-                        call_cmd = f"freebayes {caller_params} -r {interval} -f {reference_fasta} {bam_path} > {output_path}"
+                        call_cmd = f"{caller_path} {caller_params} -r {interval} -f {reference_fasta} {bam_path} > {output_path}"
                     elif variant_caller == "bcftools":
-                        call_cmd = f"bcftools mpileup -Ou -r {interval} -f {reference_fasta} {bam_path} | bcftools {caller_params} -o {output_path}"
+                        call_cmd = f"{caller_path} mpileup -Ou -r {interval} -f {reference_fasta} {bam_path} | bcftools {caller_params} -o {output_path}"
                     elif variant_caller == "gatk":
-                        call_cmd = f"gatk {caller_params} -R {reference_fasta} -I {bam_path} -L {interval} -O {output_path}"
+                        call_cmd = f"{caller_path} {caller_params} -R {reference_fasta} -I {bam_path} -L {interval} -O {output_path}"
                     else:
                         logging.error(f"Unsupported variant caller: {variant_caller}")
                         continue

@@ -55,7 +55,7 @@ def main():
                             help="Variant caller to use")
     call_parser.add_argument("--caller-params", type=str, default=None,
                             help="Additional parameters for the variant caller")
-    call_parser.add_argument("--vatiant-caller-path", type=str, default='~/.conda/envs/Python2.7/bin/freebayes',
+    call_parser.add_argument("--variant-caller-path", type=str, default='~/.conda/envs/Python2.7/bin/freebayes',
                             help="Path to variant caller executable")
     
     # Process arguments

@@ -59,12 +59,11 @@ def detect_bam_files(input_dir, bam_type=None, suffix="_filtered_merged_sorted.b
     return sorted(bam_files)
 
 def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs, 
-                                regions, reference_fasta, fai_path,
-                                window_size=1000000, variant_caller="freebayes",
-                                caller_path='~/.conda/envs/Python2.7/bin/freebayes',
-                                partition="sixhour", time="6:00:00",
-                                email="l338m483@ku.edu", mem_per_cpu="30g",
-                                caller_params=None):
+                               regions, reference_fasta, fai_path,
+                               window_size=1000000, variant_caller="freebayes",
+                               caller_path=None, partition="sixhour", time="6:00:00",
+                               email="l338m483@ku.edu", mem_per_cpu="30g",
+                               caller_params=None):
     """
     Generate SLURM jobs for variant calling using a specified caller.
     
@@ -85,8 +84,15 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
     caller_params (str): Additional parameters for the variant caller
     
     Returns:
-    list: List of generated job scripts
+    list: List of generated job script paths
     """
+    # Default paths for variant callers
+    default_paths = {
+        "freebayes": "~/.conda/envs/Python2.7/bin/freebayes",
+        "bcftools": "bcftools",
+        "gatk": "gatk"
+    }
+    
     # Default parameters for different callers
     default_params = {
         "freebayes": "-4 --limit-coverage=5000",
@@ -98,8 +104,17 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
     if caller_params is None:
         caller_params = default_params.get(variant_caller, "")
     
+    # Use default path if none specified
+    if caller_path is None:
+        caller_path = default_paths.get(variant_caller, variant_caller)
+    
     # Parse reference index
     chrom_lengths = parse_reference_index(fai_path)
+    
+    # If "all" is in regions, use all chromosomes from the FAI file
+    if "all" in regions:
+        regions = list(chrom_lengths.keys())
+        logging.info(f"Processing all {len(regions)} sequences from reference genome")
     
     # Track generated job scripts
     job_scripts = []
@@ -154,7 +169,7 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
                     if variant_caller == "freebayes":
                         call_cmd = f"{caller_path} {caller_params} -r {interval} -f {reference_fasta} {bam_path} > {output_path}"
                     elif variant_caller == "bcftools":
-                        call_cmd = f"{caller_path} mpileup -Ou -r {interval} -f {reference_fasta} {bam_path} | bcftools {caller_params} -o {output_path}"
+                        call_cmd = f"{caller_path} mpileup -Ou -r {interval} -f {reference_fasta} {bam_path} | {caller_path} call -mv -o {output_path}"
                     elif variant_caller == "gatk":
                         call_cmd = f"{caller_path} {caller_params} -R {reference_fasta} -I {bam_path} -L {interval} -O {output_path}"
                     else:
@@ -178,15 +193,16 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
                         script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
                         script.write("\n")
                         
-                        # Load module based on variant caller
-                        if variant_caller == "freebayes":
-                            script.write("module load freebayes\n")
-                        elif variant_caller == "bcftools":
-                            script.write("module load bcftools\n")
-                        elif variant_caller == "gatk":
-                            script.write("module load gatk\n")
+                        # Add relevant module loading if needed and not using full paths
+                        if not os.path.isabs(caller_path):
+                            if variant_caller == "freebayes":
+                                script.write("module load freebayes\n")
+                            elif variant_caller == "bcftools":
+                                script.write("module load bcftools\n")
+                            elif variant_caller == "gatk":
+                                script.write("module load gatk\n")
+                            script.write("\n")
                         
-                        script.write("\n")
                         script.write(f"{call_cmd}\n")
                     
                     # Make executable

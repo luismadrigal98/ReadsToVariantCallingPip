@@ -42,8 +42,8 @@ def main():
                             help="Directories for variant calling output")
     call_parser.add_argument("--job-dirs", type=str, nargs='+', required=True,
                             help="Directories for job scripts")
-    call_parser.add_argument("--regions", type=str, nargs='+', default=["Chr_01", "Chr_02"],
-                            help="Chromosomes or regions to process")
+    call_parser.add_argument("--regions", type=str, nargs='+', default=["all"],
+                        help="Chromosomes or regions to process ('all' for entire genome)")
     call_parser.add_argument("--reference", type=str, required=True,
                             help="Path to reference FASTA file")
     call_parser.add_argument("--fai", type=str, default=None,

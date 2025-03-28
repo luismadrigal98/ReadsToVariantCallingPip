@@ -2,7 +2,6 @@
 
 import argparse
 import logging
-import os
 import sys
 from src.variant_caller_utilities import *
 from src.slurm_utilities import *

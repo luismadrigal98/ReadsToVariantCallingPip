@@ -74,11 +74,11 @@ def create_fasta_index(reference_fasta, samtools_path):
     logging.info(f"Created index for reference FASTA: {reference_fasta}.fai")
 
 def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs, 
-                               regions, reference_fasta, fai_path,
-                               window_size=1000000, variant_caller="freebayes",
-                               caller_path=None, partition="sixhour", time="6:00:00",
-                               email="l338m483@ku.edu", mem_per_cpu="30g",
-                               caller_params=None):
+                                regions, reference_fasta, fai_path,
+                                window_size=1000000, variant_caller="freebayes",
+                                caller_path=None, partition="sixhour", time="6:00:00",
+                                email="l338m483@ku.edu", mem_per_cpu="30g",
+                                caller_params=None):
     """
     Generate SLURM jobs for variant calling using a specified caller.
     
@@ -304,9 +304,9 @@ def group_vcf_files_by_sample(vcf_files):
     return sample_groups
 
 def generate_vcf_merge_jobs(input_dirs, output_dirs, job_dirs,
-                         bcftools_path="bcftools", threads=10,
-                         partition="sixhour", time="6:00:00",
-                         email="l338m483@ku.edu", mem_per_cpu="5g"):
+                            bcftools_path="bcftools", threads=10,
+                            partition="sixhour", time="6:00:00",
+                            email="l338m483@ku.edu", mem_per_cpu="5g"):
     """
     Generate SLURM jobs to merge VCF files by sample.
     

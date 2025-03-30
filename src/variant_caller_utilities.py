@@ -103,7 +103,7 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
     """
     # Default paths for variant callers
     default_paths = {
-        "freebayes": "~/.conda/envs/Python2.7/bin/freebayes",
+        "freebayes": "/home/l338m483/.conda/envs/Python2.7/bin/freebayes",
         "bcftools": "bcftools",
         "gatk": "gatk"
     }

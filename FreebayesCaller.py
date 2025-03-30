@@ -143,7 +143,7 @@ def main():
                 
                 # Wait for jobs to complete
                 logging.info(f"Waiting for {len(job_ids)} variant calling jobs to complete")
-                wait_for_jobs(job_ids, args.check_interval, args.max_wait_time)
+                wait_for_jobs_to_complete(job_ids, args.check_interval, args.max_wait_time)
                 logging.info("All variant calling jobs have completed")
             else:
                 logging.info("Jobs created but not submitted. Use --submit to submit jobs.")

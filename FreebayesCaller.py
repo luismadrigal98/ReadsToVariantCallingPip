@@ -25,6 +25,8 @@ def main():
                             help="Memory per CPU")
     common_parser.add_argument("--submit", action="store_true",
                             help="Submit jobs to SLURM")
+    common_parser.add_argument("--monitor", action="store_true",
+                            help="Monitor job completion")
     common_parser.add_argument("--max-jobs", type=int, default=5000,
                             help="Maximum number of jobs to submit at once")
     common_parser.add_argument("--check-interval", type=int, default=60,
@@ -140,13 +142,16 @@ def main():
             if args.submit:
                 logging.info("Submitting variant calling jobs to SLURM")
                 job_ids = submit_jobs_with_limit(job_scripts, args.max_jobs)
-                
-                # Wait for jobs to complete
+            else:
+                logging.info("Jobs created but not submitted. Use --submit to submit jobs.")
+            
+            if args.monitor:
+                # Monitor jobs if requested
                 logging.info(f"Waiting for {len(job_ids)} variant calling jobs to complete")
                 wait_for_jobs_to_complete(job_ids, args.check_interval, args.max_wait_time)
                 logging.info("All variant calling jobs have completed")
             else:
-                logging.info("Jobs created but not submitted. Use --submit to submit jobs.")
+                logging.info("Jobs submitted. Use --monitor to track job completion.")
                 
         except Exception as e:
             logging.error(f"Error generating variant calling jobs: {e}")

@@ -58,6 +58,21 @@ def detect_bam_files(input_dir, bam_type=None, suffix="_filtered_merged_sorted.b
     
     return sorted(bam_files)
 
+def create_fasta_index(reference_fasta, samtools_path):
+    """
+    Create a FASTA index file (.fai) for the given reference FASTA file.
+    
+    Parameters:
+    reference_fasta (str): Path to the reference FASTA file
+    """
+    if not os.path.exists(reference_fasta):
+        logging.error(f"Reference FASTA file does not exist: {reference_fasta}")
+        return
+    
+    # Use samtools to create the index
+    os.system(f"{samtools_path} faidx {reference_fasta}")
+    logging.info(f"Created index for reference FASTA: {reference_fasta}.fai")
+
 def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs, 
                                regions, reference_fasta, fai_path,
                                window_size=1000000, variant_caller="freebayes",

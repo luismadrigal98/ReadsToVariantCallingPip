@@ -31,6 +31,8 @@ def main():
                             help="Seconds between job status checks")
     common_parser.add_argument("--max-wait-time", type=int, default=86400,
                             help="Maximum seconds to wait for jobs")
+    common_parser.add_argumtnt("samtools_path", type=str, default='~/.conda/envs/Python2.7/bin/samtools',
+                            help="Path to samtools executable")
     
     # Call variants command
     call_parser = subparsers.add_parser('call', parents=[common_parser],
@@ -79,6 +81,38 @@ def main():
         # Set default FAI path if not provided
         if args.fai is None:
             args.fai = f"{args.reference}.fai"
+
+        # Check if index file exist, if not, create it
+        if not os.path.exists(args.fai):
+            logging.info(f"Creating index file for reference: {args.reference}")
+            create_fasta_index(args.reference, args.samtools_path)
+            args.fai = f"{args.reference}.fai"
+            logging.info(f"Index file created: {args.fai}")
+        else:
+            logging.info(f"Using existing index file: {args.fai}")
+        # Check if input directories exist
+        for input_dir in args.input_dirs:
+            if not os.path.exists(input_dir):
+                logging.error(f"Input directory does not exist: {input_dir}")
+                sys.exit(1)
+        # Check if output directories exist, if not, create them
+        for output_dir in args.output_dirs:
+            if not os.path.exists(output_dir):
+                logging.info(f"Creating output directory: {output_dir}")
+                os.makedirs(output_dir, exist_ok=True)
+            else:
+                logging.info(f"Output directory already exists: {output_dir}")
+        # Check if job directories exist, if not, create them
+        for job_dir in args.job_dirs:
+            if not os.path.exists(job_dir):
+                logging.info(f"Creating job directory: {job_dir}")
+                os.makedirs(job_dir, exist_ok=True)
+            else:
+                logging.info(f"Job directory already exists: {job_dir}")
+        # Check if variant caller executable exists
+        if not os.path.exists(args.variant_caller_path):
+            logging.error(f"Variant caller executable does not exist: {args.variant_caller_path}")
+            sys.exit(1)
         
         # Generate variant calling jobs
         try:

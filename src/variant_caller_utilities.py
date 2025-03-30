@@ -110,7 +110,7 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
     
     # Default parameters for different callers
     default_params = {
-        "freebayes": "-4 --limit-coverage=5000",
+        "freebayes": "-4 --max-coverage=5000",
         "bcftools": "call -mv",
         "gatk": "HaplotypeCaller --emit-ref-confidence GVCF"
     }

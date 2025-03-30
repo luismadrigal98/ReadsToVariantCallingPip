@@ -31,7 +31,7 @@ def main():
                             help="Seconds between job status checks")
     common_parser.add_argument("--max-wait-time", type=int, default=86400,
                             help="Maximum seconds to wait for jobs")
-    common_parser.add_argumtnt("samtools_path", type=str, default='~/.conda/envs/Python2.7/bin/samtools',
+    common_parser.add_argument("samtools_path", type=str, default='~/.conda/envs/Python2.7/bin/samtools',
                             help="Path to samtools executable")
     
     # Call variants command

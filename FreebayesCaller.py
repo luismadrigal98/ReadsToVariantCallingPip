@@ -46,7 +46,7 @@ def main():
     call_parser.add_argument("--job-dirs", type=str, nargs='+', required=True,
                             help="Directories for job scripts")
     call_parser.add_argument("--regions", type=str, nargs='+', default=["all"],
-                        help="Chromosomes or regions to process ('all' for entire genome)")
+                            help="Chromosomes or regions to process ('all' for entire genome)")
     call_parser.add_argument("--reference", type=str, required=True,
                             help="Path to reference FASTA file")
     call_parser.add_argument("--fai", type=str, default=None,
@@ -61,6 +61,19 @@ def main():
     call_parser.add_argument("--variant-caller-path", type=str, default='/home/l338m483/.conda/envs/Python2.7/bin/freebayes',
                             help="Path to variant caller executable")
     
+    merge_parser = subparsers.add_parser('merge', parents=[common_parser],
+                                    help='Merge variant calling results')
+    merge_parser.add_argument('--input-dirs', type=str, nargs='+', required=True,
+                            help='Directories containing variant calling results')
+    merge_parser.add_argument('--output-dir', type=str, required=True,
+                            help='Directory for merged results')
+    merge_parser.add_argument('--job-dir', type=str, required=True,
+                            help='Directory for job scripts')
+    merge_parser.add_argument('--bcftools_path', type=str, default='/kuhpc/sw/conda/latest/envs/bioconda/bin/bcftools',
+                            help='Path to bcftools executable')
+    merge_parser.add_argument('--threads', type=int, default=1,
+                            help='Number of threads for merging jobs')
+
     # Process arguments
     args = parser.parse_args()
     
@@ -133,7 +146,9 @@ def main():
                 time=args.time,
                 email=args.email,
                 mem_per_cpu=args.mem_per_cpu,
-                caller_params=args.caller_params
+                caller_params=args.caller_params,
+                threads=args.threads,
+                samtools_path=args.samtools_path
             )
             
             logging.info(f"Generated {len(job_scripts)} variant calling jobs")
@@ -155,6 +170,69 @@ def main():
                 
         except Exception as e:
             logging.error(f"Error generating variant calling jobs: {e}")
+            sys.exit(1)
+    
+    elif args.command == 'merge':
+        # Validate arguments
+        if len(args.input_dirs) != len(args.output_dirs) or len(args.input_dirs) != len(args.job_dirs):
+            logging.error("Number of input, output, and job directories must match")
+            sys.exit(1)
+        
+        # Check if input directories exist
+        for input_dir in args.input_dirs:
+            if not os.path.exists(input_dir):
+                logging.error(f"Input directory does not exist: {input_dir}")
+                sys.exit(1)
+        
+        # Check if output directory exists, if not, create it
+        if not os.path.exists(args.output_dir):
+            logging.info(f"Creating output directory: {args.output_dir}")
+            os.makedirs(args.output_dir, exist_ok=True)
+        else:
+            logging.info(f"Output directory already exists: {args.output_dir}")
+        
+        # Check if job directory exists, if not, create it
+        if not os.path.exists(args.job_dir):
+            logging.info(f"Creating job directory: {args.job_dir}")
+            os.makedirs(args.job_dir, exist_ok=True)
+        else:
+            logging.info(f"Job directory already exists: {args.job_dir}")
+        
+        # Check if bcftools executable exists
+        if not os.path.exists(args.bcftools_path):
+            logging.error(f"bcftools executable does not exist: {args.bcftools_path}")
+            sys.exit(1)
+        
+        # Generate merging jobs
+        try:
+            logging.info("Generating merging jobs")
+            merge_vcf_files_jobs_generator(
+                input_dirs=args.input_dirs,
+                output_dir=args.output_dir,
+                job_dir=args.job_dir,
+                bcftools_path=args.bcftools_path,
+                partition=args.partition,
+                time=args.time,
+                email=args.email,
+                mem_per_cpu=args.mem_per_cpu
+            )
+            logging.info("Generated merging jobs")
+            
+            # Submit jobs if requested
+            if args.submit:
+                logging.info("Submitting merging jobs to SLURM")
+                job_ids = submit_jobs_with_limit(args.job_dir, args.max_jobs)
+            else:
+                logging.info("Jobs created but not submitted. Use --submit to submit jobs.")
+            if args.monitor:
+                # Monitor jobs if requested
+                logging.info(f"Waiting for merging jobs to complete")
+                wait_for_jobs_to_complete(job_ids, args.check_interval, args.max_wait_time)
+                logging.info("All merging jobs have completed")
+            else:
+                logging.info("Jobs submitted. Use --monitor to track job completion.")
+        except Exception as e:
+            logging.error(f"Error generating merging jobs: {e}")
             sys.exit(1)
 
 if __name__ == "__main__":

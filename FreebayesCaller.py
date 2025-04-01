@@ -65,9 +65,9 @@ def main():
                                     help='Merge variant calling results')
     merge_parser.add_argument('--input-dirs', type=str, nargs='+', required=True,
                             help='Directories containing variant calling results')
-    merge_parser.add_argument('--output-dir', type=str, required=True,
+    merge_parser.add_argument('--output-dirs', type=str, required=True,
                             help='Directory for merged results')
-    merge_parser.add_argument('--job-dir', type=str, required=True,
+    merge_parser.add_argument('--job-dirs', type=str, required=True,
                             help='Directory for job scripts')
     merge_parser.add_argument('--bcftools_path', type=str, default='/kuhpc/sw/conda/latest/envs/bioconda/bin/bcftools',
                             help='Path to bcftools executable')
@@ -208,8 +208,8 @@ def main():
             logging.info("Generating merging jobs")
             merge_vcf_files_jobs_generator(
                 input_dirs=args.input_dirs,
-                output_dir=args.output_dir,
-                job_dir=args.job_dir,
+                output_dirs=args.output_dirs,
+                job_dirs=args.job_dirs,
                 bcftools_path=args.bcftools_path,
                 partition=args.partition,
                 time=args.time,

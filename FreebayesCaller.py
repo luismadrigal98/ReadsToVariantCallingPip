@@ -73,6 +73,9 @@ def main():
                             help='Path to bcftools executable')
     merge_parser.add_argument('--threads', type=int, default=1,
                             help='Number of threads for merging jobs')
+    merge_parser.add_argument('--merge-command', type=str, default='concat',
+                            choices=['concat', 'merge'],
+                            help='Merge command to use (concat or merge)')
 
     # Process arguments
     args = parser.parse_args()
@@ -215,6 +218,8 @@ def main():
                 time=args.time,
                 email=args.email,
                 mem_per_cpu=args.mem_per_cpu
+                threads=args.threads,
+                merge_command=args.merge_command
             )
             logging.info("Generated merging jobs")
             

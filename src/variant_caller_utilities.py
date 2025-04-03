@@ -229,7 +229,8 @@ def merge_vcf_files_jobs_generator(paths_to_vcfs, path_to_output_vcfs,
                                     bcftools_path = '/kuhpc/sw/conda/latest/envs/bioconda/bin/bcftools',
                                     partition="sixhour", time="6:00:00",
                                     email="l338m483@ku.edu", mem_per_cpu="30g",
-                                    threads = 1):
+                                    threads = 1,
+                                    merge_command = 'concat'):
     """
     Merge multiple VCF files from a given sample into one.
     
@@ -242,8 +243,8 @@ def merge_vcf_files_jobs_generator(paths_to_vcfs, path_to_output_vcfs,
     time (str): Job time limit
     email (str): Notification email
     mem_per_cpu (str): Memory per CPU
-    caller_params (str): Additional parameters for the variant caller
-
+    threads (int): Number of threads to use
+    merge_command (str): Merge command to use (default: 'concat')
 
     """
     

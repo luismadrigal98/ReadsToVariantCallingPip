@@ -224,11 +224,43 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
     
     return job_scripts
 
+def sort_vcf_files_by_region(vcf_files):
+    """
+    Sort VCF files by chromosome and position.
+    
+    Parameters:
+    vcf_files (list): List of VCF file paths
+    
+    Returns:
+    list: Sorted list of VCF file paths
+    """
+    def extract_region_info(filepath):
+        # Extract chromosome and position from filename
+        filename = os.path.basename(filepath)
+        parts = filename.split('_')
+        
+        # Try to find parts with Chr_ or : in them
+        chrom_parts = [p for p in parts if p.startswith('Chr_') or ':' in p]
+        if chrom_parts:
+            region_part = chrom_parts[0]
+            # Handle formats like "Chr_10:8000001-9000000"
+            if ':' in region_part:
+                chrom_str, pos_range = region_part.split(':', 1)
+                chrom = chrom_str.replace('Chr_', '')
+                start, end = map(int, pos_range.split('-'))
+                return (chrom, start, end)
+        
+        # Fallback - just return filename for lexicographical sorting
+        return (filename, 0, 0)
+    
+    return sorted(vcf_files, key=extract_region_info)
+
 def merge_vcf_files_jobs_generator(input_dirs, output_dirs, job_dirs,
-                                  bcftools_path='/kuhpc/sw/conda/latest/envs/bioconda/bin/bcftools',
-                                  partition="sixhour", time="6:00:00",
-                                  email="l338m483@ku.edu", mem_per_cpu="30g",
-                                  threads=1, merge_command='concat'):
+                                    sample_names=None,  # List of sample names for output files
+                                    bcftools_path='/kuhpc/sw/conda/latest/envs/bioconda/bin/bcftools',
+                                    partition="sixhour", time="6:00:00",
+                                    email="l338m483@ku.edu", mem_per_cpu="30g",
+                                    threads=1, merge_command='concat'):
     """
     Generate jobs to merge VCF files from multiple directories.
     
@@ -243,6 +275,7 @@ def merge_vcf_files_jobs_generator(input_dirs, output_dirs, job_dirs,
     mem_per_cpu (str): Memory per CPU
     threads (int): Number of threads to use
     merge_command (str): Merge command to use (default: 'concat')
+    sample_names (list): List of sample names for output files (optional)
     
     Returns:
     list: List of generated job script paths
@@ -250,10 +283,17 @@ def merge_vcf_files_jobs_generator(input_dirs, output_dirs, job_dirs,
     job_scripts = []
     
     # Process each input/output/job directory set
-    for input_dir, output_dir, job_dir in zip(input_dirs, output_dirs, job_dirs):
+    for idx, (input_dir, output_dir, job_dir) in enumerate(zip(input_dirs, output_dirs, job_dirs)):
         # Create directories if they don't exist
         create_directory(output_dir)
         create_directory(job_dir)
+        
+        # Determine sample name
+        if sample_names and idx < len(sample_names):
+            sample_name = sample_names[idx]
+        else:
+            logging.warning(f"No sample name provided for index {idx}. Using default.")
+            sample_name = f"sample_{idx}"
         
         # Find all VCF files in the input directory
         vcf_files = [f for f in os.listdir(input_dir) if f.endswith('.vcf')]
@@ -261,28 +301,52 @@ def merge_vcf_files_jobs_generator(input_dirs, output_dirs, job_dirs,
             logging.warning(f"No VCF files found in {input_dir}")
             continue
         
-        # Group VCF files by sample name
-        sample_groups = {}
+        # Group VCF files by chromosome
+        chrom_groups = {}
         for vcf_file in vcf_files:
-            # Assuming sample name is the first part of the filename before underscore
-            sample_name = vcf_file.split("_")[0]
-            if sample_name not in sample_groups:
-                sample_groups[sample_name] = []
-            sample_groups[sample_name].append(os.path.join(input_dir, vcf_file))
+            # Parse the chromosome from the filename
+            # Format: Chr_14_13000001-14000000_freebayes_variants.vcf
+            parts = vcf_file.split('_')
+            if len(parts) >= 3 and parts[0] == 'Chr':
+                chromosome = parts[1]  # Extract chromosome number
+                if chromosome not in chrom_groups:
+                    chrom_groups[chromosome] = []
+                chrom_groups[chromosome].append(os.path.join(input_dir, vcf_file))
         
-        # Create merge job for each sample
-        for sample_name, sample_files in sample_groups.items():
-            # Define output filename
-            merged_vcf = os.path.join(output_dir, f"{sample_name}_merged.vcf")
+        # Sort chromosomes numerically if possible
+        chromosomes = sorted(chrom_groups.keys(), key=lambda x: int(x) if x.isdigit() else x)
+        
+        # Process each chromosome
+        for chromosome in chromosomes:
+            # Sort files by position
+            def extract_position(filepath):
+                filename = os.path.basename(filepath)
+                parts = filename.split('_')
+                if len(parts) >= 3:
+                    pos_part = parts[2]
+                    if '-' in pos_part:
+                        start, _ = pos_part.split('-', 1)
+                        return int(start)
+                return 0
+            
+            sorted_files = sorted(chrom_groups[chromosome], key=extract_position)
+            
+            # Create output filename
+            if sample_name:
+                output_filename = f"{sample_name}_Chr_{chromosome}_merged.vcf"
+            else:
+                output_filename = f"Chr_{chromosome}_merged.vcf"
+                
+            merged_vcf = os.path.join(output_dir, output_filename)
             
             # Create job script path
-            job_script_path = os.path.join(job_dir, f"merge_{sample_name}_job.sh")
+            job_script_path = os.path.join(job_dir, f"merge_Chr_{chromosome}_job.sh")
             
             # Create job script
             with open(job_script_path, "w") as script:
                 script.write("#!/bin/bash\n")
-                script.write(f"#SBATCH --job-name=merge_{sample_name}_job\n")
-                script.write(f"#SBATCH --output={os.path.join(job_dir, f'merge_{sample_name}_output')}\n")
+                script.write(f"#SBATCH --job-name=merge_Chr_{chromosome}_job\n")
+                script.write(f"#SBATCH --output={os.path.join(job_dir, f'merge_Chr_{chromosome}_output')}\n")
                 script.write(f"#SBATCH --partition={partition}\n")
                 script.write("#SBATCH --nodes=1\n")
                 script.write("#SBATCH --ntasks=1\n")
@@ -298,9 +362,6 @@ def merge_vcf_files_jobs_generator(input_dirs, output_dirs, job_dirs,
                     script.write("module load bcftools\n")
                     script.write("\n")
                 
-                # Sort files by position/chromosome
-                sorted_files = sorted(sample_files)
-                
                 # Write the command to merge VCF files
                 vcf_files_str = ' '.join(sorted_files)
                 if merge_command == 'concat':
@@ -308,15 +369,17 @@ def merge_vcf_files_jobs_generator(input_dirs, output_dirs, job_dirs,
                 else:
                     merge_cmd = f"{bcftools_path} merge --threads {threads} -Ov -o {merged_vcf} {vcf_files_str}"
                 
-                # Write the command to the script
                 script.write(f"{merge_cmd}\n")
             
             # Make executable
             os.chmod(job_script_path, 0o755)
             
-            # Add to list of job scripts
+            # Add to job scripts
             job_scripts.append(job_script_path)
             
-            logging.info(f"Created VCF merging job for sample {sample_name}: {job_script_path}")
+            if sample_name:
+                logging.info(f"Created merge job for chromosome {chromosome} in sample {sample_name}: {job_script_path}")
+            else:
+                logging.info(f"Created merge job for chromosome {chromosome}: {job_script_path}")
     
     return job_scripts

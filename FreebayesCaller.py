@@ -63,6 +63,9 @@ def main():
     
     merge_parser = subparsers.add_parser('merge', parents=[common_parser],
                                     help='Merge variant calling results')
+    # Add this to your merge_parser arguments
+    merge_parser.add_argument('--sample-names', type=str, nargs='+', required=False,
+                            help='Sample names for merged output files')
     merge_parser.add_argument('--input-dirs', type=str, nargs='+', required=True,
                             help='Directories containing variant calling results')
     merge_parser.add_argument('--output-dirs', type=str, nargs='+', required=True,
@@ -216,6 +219,7 @@ def main():
                 input_dirs=args.input_dirs,
                 output_dirs=args.output_dirs,
                 job_dirs=args.job_dirs,
+                sample_names=args.sample_names,
                 bcftools_path=args.bcftools_path,
                 partition=args.partition,
                 time=args.time,

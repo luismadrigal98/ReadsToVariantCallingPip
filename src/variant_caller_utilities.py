@@ -248,6 +248,8 @@ def merge_vcf_files_jobs_generator(paths_to_vcfs, path_to_output_vcfs,
 
     """
     
+    job_scripts = []
+
     for path_to_vcf, job_dir in zip(paths_to_vcfs, job_dirs):
         # Create output directory if it doesn't exist
         create_directory(path_to_output_vcfs)
@@ -286,8 +288,12 @@ def merge_vcf_files_jobs_generator(paths_to_vcfs, path_to_output_vcfs,
             
             # Write the command to the script
             script.write(f"{merge_cmd}\n")
+
+            job_scripts.append(job_script_path)
         
         # Make executable
         os.chmod(job_script_path, 0o755)
         
         logging.info(f"Created VCF merging job for sample {sample_name}: {job_script_path}")
+
+    return job_scripts

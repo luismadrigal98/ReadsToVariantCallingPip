@@ -188,18 +188,21 @@ def main():
                 sys.exit(1)
         
         # Check if output directory exists, if not, create it
-        if not os.path.exists(args.output_dirs):
-            logging.info(f"Creating output directory: {args.output_dirs}")
-            os.makedirs(args.output_dirs, exist_ok=True)
-        else:
-            logging.info(f"Output directory already exists: {args.output_dirs}")
+        for output_dir in args.output_dirs:
+            if not os.path.exists(output_dir):
+                logging.info(f"Creating output directory: {output_dir}")
+                os.makedirs(output_dir, exist_ok=True)
+            else:
+                logging.info(f"Output directory already exists: {output_dir}")
         
         # Check if job directory exists, if not, create it
-        if not os.path.exists(args.job_dirs):
-            logging.info(f"Creating job directory: {args.job_dirs}")
-            os.makedirs(args.job_dirs, exist_ok=True)
-        else:
-            logging.info(f"Job directory already exists: {args.job_dirs}")
+        for job_dir in args.job_dirs:
+            if not os.path.exists(job_dir):
+                logging.info(f"Creating job directory: {job_dir}")
+                os.makedirs(job_dir, exist_ok=True)
+            else:
+                logging.info(f"Job directory already exists: {job_dir}")
+
         
         # Check if bcftools executable exists
         if not os.path.exists(args.bcftools_path):
@@ -209,7 +212,7 @@ def main():
         # Generate merging jobs
         try:
             logging.info("Generating merging jobs")
-            merge_vcf_files_jobs_generator(
+            job_scripts = merge_vcf_files_jobs_generator(  # Save the returned job scripts
                 input_dirs=args.input_dirs,
                 output_dirs=args.output_dirs,
                 job_dirs=args.job_dirs,

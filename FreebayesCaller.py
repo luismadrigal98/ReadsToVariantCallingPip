@@ -79,7 +79,10 @@ def main():
     merge_parser.add_argument('--merge-command', type=str, default='concat',
                             choices=['concat', 'merge'],
                             help='Merge command to use (concat or merge)')
-
+    merge_parser.add_argument('--merge-mode', type=str, default='global',
+                        choices=['global', 'by_chromosome'],
+                        help='Merge all files into one (global) or merge by chromosome')
+    
     # Process arguments
     args = parser.parse_args()
     
@@ -215,7 +218,7 @@ def main():
         # Generate merging jobs
         try:
             logging.info("Generating merging jobs")
-            job_scripts = merge_vcf_files_jobs_generator(  # Save the returned job scripts
+            job_scripts = merge_vcf_files_jobs_generator(
                 input_dirs=args.input_dirs,
                 output_dirs=args.output_dirs,
                 job_dirs=args.job_dirs,
@@ -226,8 +229,9 @@ def main():
                 email=args.email,
                 mem_per_cpu=args.mem_per_cpu,
                 threads=args.threads,
-                merge_command=args.merge_command
-            )
+                merge_command=args.merge_command,
+                merge_mode=args.merge_mode  
+                )
             logging.info("Generated merging jobs")
             
             # Submit jobs if requested

@@ -224,19 +224,17 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
     
     return job_scripts
 
-def merge_vcf_files_jobs_generator(paths_to_vcfs, path_to_output_vcfs, 
-                                    job_dirs,
-                                    bcftools_path = '/kuhpc/sw/conda/latest/envs/bioconda/bin/bcftools',
-                                    partition="sixhour", time="6:00:00",
-                                    email="l338m483@ku.edu", mem_per_cpu="30g",
-                                    threads = 1,
-                                    merge_command = 'concat'):
+def merge_vcf_files_jobs_generator(input_dirs, output_dirs, job_dirs,
+                                  bcftools_path='/kuhpc/sw/conda/latest/envs/bioconda/bin/bcftools',
+                                  partition="sixhour", time="6:00:00",
+                                  email="l338m483@ku.edu", mem_per_cpu="30g",
+                                  threads=1, merge_command='concat'):
     """
-    Merge multiple VCF files from a given sample into one.
+    Generate jobs to merge VCF files from multiple directories.
     
     Parameters:
-    paths_to_vcfs (list): List of paths to VCF files to merge
-    path_to_output_vcfs (str): Directory to save the merged VCF file
+    input_dirs (list): List of directories containing VCF files
+    output_dirs (list): List of directories for merged output
     job_dirs (list): List of directories for job scripts
     bcftools_path (str): Path to the bcftools executable
     partition (str): SLURM partition
@@ -245,55 +243,80 @@ def merge_vcf_files_jobs_generator(paths_to_vcfs, path_to_output_vcfs,
     mem_per_cpu (str): Memory per CPU
     threads (int): Number of threads to use
     merge_command (str): Merge command to use (default: 'concat')
-
-    """
     
+    Returns:
+    list: List of generated job script paths
+    """
     job_scripts = []
-
-    for path_to_vcf, job_dir in zip(paths_to_vcfs, job_dirs):
-        # Create output directory if it doesn't exist
-        create_directory(path_to_output_vcfs)
+    
+    # Process each input/output/job directory set
+    for input_dir, output_dir, job_dir in zip(input_dirs, output_dirs, job_dirs):
+        # Create directories if they don't exist
+        create_directory(output_dir)
+        create_directory(job_dir)
         
-        # Extract sample name from the path
-        sample_name = os.path.basename(path_to_vcf).split("_")[0]
+        # Find all VCF files in the input directory
+        vcf_files = [f for f in os.listdir(input_dir) if f.endswith('.vcf')]
+        if not vcf_files:
+            logging.warning(f"No VCF files found in {input_dir}")
+            continue
         
-        # Define output filename for the merged VCF
-        merged_vcf = os.path.join(path_to_output_vcfs, f"{sample_name}_merged.vcf")
+        # Group VCF files by sample name
+        sample_groups = {}
+        for vcf_file in vcf_files:
+            # Assuming sample name is the first part of the filename before underscore
+            sample_name = vcf_file.split("_")[0]
+            if sample_name not in sample_groups:
+                sample_groups[sample_name] = []
+            sample_groups[sample_name].append(os.path.join(input_dir, vcf_file))
         
-        # Create job script
-        job_script_path = os.path.join(job_dir, f"merge_{sample_name}_job.sh")
-        
-        with open(job_script_path, "w") as script:
-            script.write("#!/bin/bash\n")
-            script.write(f"#SBATCH --job-name=merge_{sample_name}_job\n")
-            script.write(f"#SBATCH --output={os.path.join(job_dir, f'merge_{sample_name}_output')}\n")
-            script.write(f"#SBATCH --partition={partition}\n")
-            script.write("#SBATCH --nodes=1\n")
-            script.write("#SBATCH --ntasks=1\n")
-            script.write(f"#SBATCH --cpus-per-task={threads}\n")
-            script.write(f"#SBATCH --time={time}\n")
-            script.write(f"#SBATCH --mail-user={email}\n")
-            script.write("#SBATCH --mail-type=FAIL\n")
-            script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
-            script.write("\n")
+        # Create merge job for each sample
+        for sample_name, sample_files in sample_groups.items():
+            # Define output filename
+            merged_vcf = os.path.join(output_dir, f"{sample_name}_merged.vcf")
             
-            # Add module loading if needed
-            if not os.path.isabs(bcftools_path):
-                script.write("module load bcftools\n")
+            # Create job script path
+            job_script_path = os.path.join(job_dir, f"merge_{sample_name}_job.sh")
+            
+            # Create job script
+            with open(job_script_path, "w") as script:
+                script.write("#!/bin/bash\n")
+                script.write(f"#SBATCH --job-name=merge_{sample_name}_job\n")
+                script.write(f"#SBATCH --output={os.path.join(job_dir, f'merge_{sample_name}_output')}\n")
+                script.write(f"#SBATCH --partition={partition}\n")
+                script.write("#SBATCH --nodes=1\n")
+                script.write("#SBATCH --ntasks=1\n")
+                script.write(f"#SBATCH --cpus-per-task={threads}\n")
+                script.write(f"#SBATCH --time={time}\n")
+                script.write(f"#SBATCH --mail-user={email}\n")
+                script.write("#SBATCH --mail-type=FAIL\n")
+                script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
                 script.write("\n")
+                
+                # Add module loading if needed
+                if not os.path.isabs(bcftools_path):
+                    script.write("module load bcftools\n")
+                    script.write("\n")
+                
+                # Sort files by position/chromosome
+                sorted_files = sorted(sample_files)
+                
+                # Write the command to merge VCF files
+                vcf_files_str = ' '.join(sorted_files)
+                if merge_command == 'concat':
+                    merge_cmd = f"{bcftools_path} concat --threads {threads} -Ov -o {merged_vcf} {vcf_files_str}"
+                else:
+                    merge_cmd = f"{bcftools_path} merge --threads {threads} -Ov -o {merged_vcf} {vcf_files_str}"
+                
+                # Write the command to the script
+                script.write(f"{merge_cmd}\n")
             
-            # Write the command to merge VCF files
-            vcf_files_str = ' '.join(paths_to_vcfs)
-            merge_cmd = f"{bcftools_path} concat --threads {threads} -o {merged_vcf} {vcf_files_str}"
+            # Make executable
+            os.chmod(job_script_path, 0o755)
             
-            # Write the command to the script
-            script.write(f"{merge_cmd}\n")
-
+            # Add to list of job scripts
             job_scripts.append(job_script_path)
-        
-        # Make executable
-        os.chmod(job_script_path, 0o755)
-        
-        logging.info(f"Created VCF merging job for sample {sample_name}: {job_script_path}")
-
+            
+            logging.info(f"Created VCF merging job for sample {sample_name}: {job_script_path}")
+    
     return job_scripts

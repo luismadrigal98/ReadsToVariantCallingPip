@@ -229,7 +229,7 @@ def main():
             # Submit jobs if requested
             if args.submit:
                 logging.info("Submitting merging jobs to SLURM")
-                job_ids = submit_jobs_with_limit(args.job_dirs, args.max_jobs)
+                job_ids = submit_jobs_with_limit(job_scripts, args.max_jobs)
             else:
                 logging.info("Jobs created but not submitted. Use --submit to submit jobs.")
             if args.monitor:

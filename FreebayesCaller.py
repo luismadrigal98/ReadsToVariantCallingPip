@@ -217,7 +217,7 @@ def main():
                 partition=args.partition,
                 time=args.time,
                 email=args.email,
-                mem_per_cpu=args.mem_per_cpu
+                mem_per_cpu=args.mem_per_cpu,
                 threads=args.threads,
                 merge_command=args.merge_command
             )

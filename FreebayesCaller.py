@@ -185,18 +185,18 @@ def main():
                 sys.exit(1)
         
         # Check if output directory exists, if not, create it
-        if not os.path.exists(args.output_dir):
-            logging.info(f"Creating output directory: {args.output_dir}")
-            os.makedirs(args.output_dir, exist_ok=True)
+        if not os.path.exists(args.output_dirs):
+            logging.info(f"Creating output directory: {args.output_dirs}")
+            os.makedirs(args.output_dirs, exist_ok=True)
         else:
-            logging.info(f"Output directory already exists: {args.output_dir}")
+            logging.info(f"Output directory already exists: {args.output_dirs}")
         
         # Check if job directory exists, if not, create it
-        if not os.path.exists(args.job_dir):
-            logging.info(f"Creating job directory: {args.job_dir}")
+        if not os.path.exists(args.job_dirs):
+            logging.info(f"Creating job directory: {args.job_dirs}")
             os.makedirs(args.job_dir, exist_ok=True)
         else:
-            logging.info(f"Job directory already exists: {args.job_dir}")
+            logging.info(f"Job directory already exists: {args.job_dirs}")
         
         # Check if bcftools executable exists
         if not os.path.exists(args.bcftools_path):

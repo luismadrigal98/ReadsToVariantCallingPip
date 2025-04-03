@@ -281,7 +281,7 @@ def merge_vcf_files_jobs_generator(paths_to_vcfs, path_to_output_vcfs,
             
             # Write the command to merge VCF files
             vcf_files_str = ' '.join(paths_to_vcfs)
-            merge_cmd = f"{bcftools_path} merge -o {merged_vcf} {vcf_files_str}"
+            merge_cmd = f"{bcftools_path} concat --threads {threads} -o {merged_vcf} {vcf_files_str}"
             
             # Write the command to the script
             script.write(f"{merge_cmd}\n")

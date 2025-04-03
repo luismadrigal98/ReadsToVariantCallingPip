@@ -65,9 +65,9 @@ def main():
                                     help='Merge variant calling results')
     merge_parser.add_argument('--input-dirs', type=str, nargs='+', required=True,
                             help='Directories containing variant calling results')
-    merge_parser.add_argument('--output-dirs', type=str, required=True,
+    merge_parser.add_argument('--output-dirs', type=str, nargs='+', required=True,
                             help='Directory for merged results')
-    merge_parser.add_argument('--job-dirs', type=str, required=True,
+    merge_parser.add_argument('--job-dirs', type=str, nargs='+', required=True,
                             help='Directory for job scripts')
     merge_parser.add_argument('--bcftools_path', type=str, default='/kuhpc/sw/conda/latest/envs/bioconda/bin/bcftools',
                             help='Path to bcftools executable')
@@ -197,7 +197,7 @@ def main():
         # Check if job directory exists, if not, create it
         if not os.path.exists(args.job_dirs):
             logging.info(f"Creating job directory: {args.job_dirs}")
-            os.makedirs(args.job_dir, exist_ok=True)
+            os.makedirs(args.job_dirs, exist_ok=True)
         else:
             logging.info(f"Job directory already exists: {args.job_dirs}")
         
@@ -226,7 +226,7 @@ def main():
             # Submit jobs if requested
             if args.submit:
                 logging.info("Submitting merging jobs to SLURM")
-                job_ids = submit_jobs_with_limit(args.job_dir, args.max_jobs)
+                job_ids = submit_jobs_with_limit(args.job_dirs, args.max_jobs)
             else:
                 logging.info("Jobs created but not submitted. Use --submit to submit jobs.")
             if args.monitor:

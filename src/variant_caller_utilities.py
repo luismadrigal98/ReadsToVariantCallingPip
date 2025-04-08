@@ -28,6 +28,25 @@ def parse_reference_index(fai_path):
             chrom_lengths[cols[0]] = int(cols[1])
     return chrom_lengths
 
+def extract_sample_names_from_bams(bam_files, suffix="_filtered_merged_sorted.bam"):
+    """
+    Extract sample names from BAM filenames and normalize year patterns.
+    
+    Parameters:
+    bam_files (list): List of BAM filenames
+    suffix (str): Suffix to remove from BAM filenames
+    
+    Returns:
+    list: List of cleaned sample names
+    """
+    sample_names = []
+    for bam_file in bam_files:
+        base_name = bam_file.replace(suffix, "")
+        # Use regex to normalize year patterns (e.g., 12A, 12B, 2012A, etc.)
+        sample_name = re.sub(r'(\d{2,4})([A-Z])', r'\1', base_name)
+        sample_names.append(sample_name)
+    return sample_names
+
 def detect_bam_files(input_dir, bam_type=None, suffix="_filtered_merged_sorted.bam"):
     """
     Find BAM files in a directory, optionally filtering by type.
@@ -209,28 +228,46 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
                         bam_path = os.path.join(input_dir, bam_files[0])
                         paired_bam_path = os.path.join(paired_input_dirs[i], paired_bam_files[0])
                         
-                        # Extract common sample name (removing A/B suffix if present)
+                        # Extract common sample name using regex instead of hard-coded replacement
                         sample_name = bam_files[0].replace("_filtered_merged_sorted.bam", "")
-                        sample_name = sample_name.replace("12A", "12").replace("12B", "12")  # Handle year suffixes
+                        sample_name = re.sub(r'(\d{2,4})([A-Z])', r'\1', sample_name)  # E.g., "12A" -> "12"
                         
                         output_vcf = f"{sample_name}_{interval.replace(':', '_')}_bcftools_variants.vcf"
                         output_path = os.path.join(output_dir, output_vcf)
                         
-                        # Construct command with mpileup | call pipeline
+                        # Create a temporary samples file for bcftools to recognize individual samples
+                        samples_file = os.path.join(job_dir, f"samples_{sample_name}_{i}.txt")
+                        with open(samples_file, "w") as sf:
+                            sf.write(f"{bam_path}\t{sample_name}\n")
+                            sf.write(f"{paired_bam_path}\t{sample_name}_paired\n")
+                        
+                        # Construct command with mpileup | call pipeline and samples file
                         call_cmd = (f"{caller_path} mpileup --threads={threads} -Ou -a FORMAT/AD --max-depth 5000 "
-                                   f"-r {interval} -f {reference_fasta} {bam_path} {paired_bam_path} | "
-                                   f"{caller_path} call -mv -Ov --threads={threads} -o {output_path}")
+                                f"-r {interval} -f {reference_fasta} {bam_path} {paired_bam_path} | "
+                                f"{caller_path} call -mv --samples-file {samples_file} -Ov --threads={threads} -o {output_path}")
                     else:
                         # Standard case (single directory or multiple samples)
                         bam_paths = ' '.join([os.path.join(input_dir, f) for f in bam_files])
+                        all_bam_files = bam_files.copy()
+                        all_bam_paths = [os.path.join(input_dir, f) for f in bam_files]
+                        
                         if is_paired:
                             # Add paired BAM files
                             paired_bam_paths = ' '.join([os.path.join(paired_input_dirs[i], f) for f in paired_bam_files])
                             bam_paths = f"{bam_paths} {paired_bam_paths}"
+                            all_bam_files.extend(paired_bam_files)
+                            all_bam_paths.extend([os.path.join(paired_input_dirs[i], f) for f in paired_bam_files])
+                        
+                        # Create a temporary samples file for bcftools to recognize individual samples
+                        samples_file = os.path.join(job_dir, f"samples_{i}_{interval.replace(':', '_')}.txt")
+                        with open(samples_file, "w") as sf:
+                            sample_names = extract_sample_names_from_bams(all_bam_files)
+                            for path, sample in zip(all_bam_paths, sample_names):
+                                sf.write(f"{path}\t{sample}\n")
                         
                         call_cmd = (f"{caller_path} mpileup --threads={threads} -Ou -a FORMAT/AD --max-depth 5000 "
-                                   f"-r {interval} -f {reference_fasta} {bam_paths} | "
-                                   f"{caller_path} call -mv -Ov --threads={threads} -o {output_path}")
+                                f"-r {interval} -f {reference_fasta} {bam_paths} | "
+                                f"{caller_path} call -mv --samples-file {samples_file} -Ov --threads={threads} -o {output_path}")
                 
                 elif variant_caller == "gatk":
                     # For GATK, we need to format the input differently

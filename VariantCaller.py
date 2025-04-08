@@ -66,24 +66,24 @@ def main():
     
     # Call command
     call_parser = subparsers.add_parser("call", parents=[common_parser],
-                                      help="Run variant calling")
+                                        help="Run variant calling")
     call_parser.add_argument("--input-dirs", type=str, nargs="+", required=True,
-                           help="Directories containing BAM files")
+                            help="Directories containing BAM files")
     call_parser.add_argument("--output-dirs", type=str, nargs="+", required=True,
-                           help="Directories for variant calling output")
+                            help="Directories for variant calling output")
     call_parser.add_argument("--job-dirs", type=str, nargs="+", required=True,
-                           help="Directories for job scripts")
+                            help="Directories for job scripts")
     call_parser.add_argument("--variant-caller", type=str, default="freebayes",
-                           choices=["freebayes", "bcftools", "gatk"],
-                           help="Variant caller to use")
+                            choices=["freebayes", "bcftools", "gatk"],
+                            help="Variant caller to use")
     call_parser.add_argument("--caller-path", type=str, default=None,
-                           help="Path to variant caller executable")
+                            help="Path to variant caller executable")
     call_parser.add_argument("--caller-params", type=str, default=None,
-                           help="Additional parameters for variant caller")
+                            help="Additional parameters for variant caller")
     
     # Joint call command
     joint_parser = subparsers.add_parser("joint-call", parents=[common_parser],
-                                       help="Run joint variant calling with paired directories")
+                                        help="Run joint variant calling with paired directories")
     joint_parser.add_argument("--input-dirs-1", type=str, nargs="+", required=True,
                             help="First set of directories containing BAM files")
     joint_parser.add_argument("--input-dirs-2", type=str, nargs="+", required=True,

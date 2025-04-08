@@ -132,7 +132,7 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
     # Default parameters for different callers
     default_params = {
         "freebayes": "-4 --max-coverage=5000",
-        "bcftools": "call -mv",
+        "bcftools": "/kuhpc/sw/conda/latest/envs/bioconda/bin/bcftools",
         "gatk": "HaplotypeCaller --emit-ref-confidence GVCF"
     }
     
@@ -298,16 +298,6 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
                     script.write("#SBATCH --mail-type=FAIL\n")
                     script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
                     script.write("\n")
-                    
-                    # Add module loading if needed
-                    if not os.path.isabs(caller_path):
-                        if variant_caller == "freebayes":
-                            script.write("module load freebayes\n")
-                        elif variant_caller == "bcftools":
-                            script.write("module load bcftools/1.14\n")
-                        elif variant_caller == "gatk":
-                            script.write("module load gatk\n")
-                        script.write("\n")
                     
                     # Write the command
                     script.write(f"{call_cmd}\n")

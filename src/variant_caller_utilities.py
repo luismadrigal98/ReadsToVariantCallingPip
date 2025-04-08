@@ -244,11 +244,14 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
                         with open(samples_file, "w") as sf:
                             sf.write(f"{bam_path}\t{sample_name}\n")
                             sf.write(f"{paired_bam_path}\t{sample_name}_paired\n")
-                        
+
+                        sample_names_list = extract_sample_names_from_bams(all_bam_files)
+                        sample_names_str = ",".join(sample_names_list)
+
                         # Construct command with mpileup | call pipeline and samples file
                         call_cmd = (f"{caller_path} mpileup --threads={threads} -Ou -a FORMAT/AD --max-depth 5000 "
                                 f"-r {interval} -f {reference_fasta} {bam_path} {paired_bam_path} | "
-                                f"{caller_path} call -mv --samples-file {samples_file} -Ov --threads={threads} -o {output_path}")
+                                f"{caller_path} call -mv -s {sample_names_str} -Ov --threads={threads} -o {output_path}")
                     else:
                         # Standard case (single directory or multiple samples)
                         bam_paths = ' '.join([os.path.join(input_dir, f) for f in bam_files])
@@ -269,9 +272,12 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
                             for path, sample in zip(all_bam_paths, sample_names):
                                 sf.write(f"{path}\t{sample}\n")
                         
+                        sample_names_list = extract_sample_names_from_bams(all_bam_files)
+                        sample_names_str = ",".join(sample_names_list)
+
                         call_cmd = (f"{caller_path} mpileup --threads={threads} {caller_params} "
                                 f"-r {interval} -f {reference_fasta} {bam_paths} | "
-                                f"{caller_path} call -mv --samples-file {samples_file} -Ov --threads={threads} -o {output_path}")
+                                f"{caller_path} call -mv -s {sample_names_str} -Ov --threads={threads} -o {output_path}")
                 
                 elif variant_caller == "gatk":
                     # For GATK, we need to format the input differently

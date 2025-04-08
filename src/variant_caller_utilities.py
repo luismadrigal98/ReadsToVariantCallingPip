@@ -44,6 +44,10 @@ def extract_sample_names_from_bams(bam_files, suffix="_filtered_merged_sorted.ba
         base_name = bam_file.replace(suffix, "")
         # Use regex to normalize year patterns (e.g., 12A, 12B, 2012A, etc.)
         sample_name = re.sub(r'(\d{2,4})([A-Z])', r'\1', base_name)
+        if (len(sample_name.split('_')) > 1):
+            sample_name = sample_name.split('_')[0]
+        # Remove any leading/trailing whitespace
+        sample_name = sample_name.strip()
         sample_names.append(sample_name)
     return sample_names
 

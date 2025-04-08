@@ -78,7 +78,7 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
                                 window_size=1000000, variant_caller="freebayes",
                                 caller_path=None, partition="sixhour", time="6:00:00",
                                 email="l338m483@ku.edu", mem_per_cpu="30g",
-                                caller_params=None):
+                                caller_params=None, paired_input_dirs=None, threads=1):
     """
     Generate SLURM jobs for variant calling using a specified caller.
     
@@ -97,6 +97,8 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
     email (str): Notification email
     mem_per_cpu (str): Memory per CPU
     caller_params (str): Additional parameters for the variant caller
+    paired_input_dirs (list): List of paired directories for joint calling (optional)
+    threads (int): Number of threads to use
     
     Returns:
     list: List of generated job script paths
@@ -134,16 +136,30 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
     # Track generated job scripts
     job_scripts = []
     
-    for input_dir, output_dir, job_dir in zip(input_dirs, output_dirs, job_dirs):
+    # Check if we're doing paired analysis
+    is_paired = paired_input_dirs is not None and len(paired_input_dirs) == len(input_dirs)
+    
+    # Process directories
+    for i, (input_dir, output_dir, job_dir) in enumerate(zip(input_dirs, output_dirs, job_dirs)):
         # Create output and job directories if they don't exist
         create_directory(output_dir)
         create_directory(job_dir)
         
-        # Get ALL BAM files from input directory
+        # Get BAM files from input directory
         bam_files = detect_bam_files(input_dir)
         if not bam_files:
             logging.warning(f"No BAM files found in {input_dir}")
             continue
+        
+        # Get paired BAM files if applicable
+        paired_bam_files = []
+        if is_paired:
+            paired_input_dir = paired_input_dirs[i]
+            paired_bam_files = detect_bam_files(paired_input_dir)
+            if not paired_bam_files:
+                logging.warning(f"No BAM files found in paired directory {paired_input_dir}")
+                continue
+            logging.info(f"Found {len(paired_bam_files)} paired BAM files in {paired_input_dir}")
         
         # Process each region of interest
         for region in regions:
@@ -166,35 +182,80 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
                 script_name = f"{variant_caller}_{interval.replace(':', '_')}"
                 
                 # Define output filename for the region
-                output_vcf = f"{interval.replace(':', '_')}_{variant_caller}_variants.vcf"
+                if len(bam_files) == 1:
+                    # Extract sample name from BAM filename
+                    sample_name = bam_files[0].replace("_filtered_merged_sorted.bam", "")
+                    output_vcf = f"{sample_name}_{interval.replace(':', '_')}_{variant_caller}_variants.vcf"
+                else:
+                    output_vcf = f"{interval.replace(':', '_')}_{variant_caller}_variants.vcf"
+                
                 output_path = os.path.join(output_dir, output_vcf)
                 
-                # Create variant calling command with ALL BAM files
-                bam_paths = ' '.join([os.path.join(input_dir, f) for f in bam_files])
-                
+                # Create variant calling command
                 if variant_caller == "freebayes":
+                    # For Freebayes
+                    bam_paths = ' '.join([os.path.join(input_dir, f) for f in bam_files])
+                    if is_paired:
+                        # Add paired BAM files
+                        paired_bam_paths = ' '.join([os.path.join(paired_input_dirs[i], f) for f in paired_bam_files])
+                        bam_paths = f"{bam_paths} {paired_bam_paths}"
+                    
                     call_cmd = f"{caller_path} {caller_params} -r {interval} -f {reference_fasta} {bam_paths} > {output_path}"
+                
                 elif variant_caller == "bcftools":
-                    call_cmd = f"{caller_path} mpileup -Ou -r {interval} -f {reference_fasta} {bam_paths} | {caller_path} call -mv -o {output_path}"
+                    # For bcftools with mpileup+call pipeline
+                    if len(bam_files) == 1 and is_paired and len(paired_bam_files) == 1:
+                        # Special case for paired calling with one sample per directory
+                        bam_path = os.path.join(input_dir, bam_files[0])
+                        paired_bam_path = os.path.join(paired_input_dirs[i], paired_bam_files[0])
+                        
+                        # Extract common sample name (removing A/B suffix if present)
+                        sample_name = bam_files[0].replace("_filtered_merged_sorted.bam", "")
+                        sample_name = sample_name.replace("12A", "12").replace("12B", "12")  # Handle year suffixes
+                        
+                        output_vcf = f"{sample_name}_{interval.replace(':', '_')}_bcftools_variants.vcf"
+                        output_path = os.path.join(output_dir, output_vcf)
+                        
+                        # Construct command with mpileup | call pipeline
+                        call_cmd = (f"{caller_path} mpileup --threads={threads} -Ou -a FORMAT/AD --max-depth 5000 "
+                                   f"-r {interval} -f {reference_fasta} {bam_path} {paired_bam_path} | "
+                                   f"{caller_path} call -mv -Ov --threads={threads} -o {output_path}")
+                    else:
+                        # Standard case (single directory or multiple samples)
+                        bam_paths = ' '.join([os.path.join(input_dir, f) for f in bam_files])
+                        if is_paired:
+                            # Add paired BAM files
+                            paired_bam_paths = ' '.join([os.path.join(paired_input_dirs[i], f) for f in paired_bam_files])
+                            bam_paths = f"{bam_paths} {paired_bam_paths}"
+                        
+                        call_cmd = (f"{caller_path} mpileup --threads={threads} -Ou -a FORMAT/AD --max-depth 5000 "
+                                   f"-r {interval} -f {reference_fasta} {bam_paths} | "
+                                   f"{caller_path} call -mv -Ov --threads={threads} -o {output_path}")
+                
                 elif variant_caller == "gatk":
                     # For GATK, we need to format the input differently
                     gatk_inputs = ' '.join([f"-I {os.path.join(input_dir, f)}" for f in bam_files])
+                    if is_paired:
+                        # Add paired BAM files
+                        paired_gatk_inputs = ' '.join([f"-I {os.path.join(paired_input_dirs[i], f)}" for f in paired_bam_files])
+                        gatk_inputs = f"{gatk_inputs} {paired_gatk_inputs}"
+                    
                     call_cmd = f"{caller_path} {caller_params} -R {reference_fasta} {gatk_inputs} -L {interval} -O {output_path}"
                 else:
                     logging.error(f"Unsupported variant caller: {variant_caller}")
                     continue
                 
                 # Create job script
-                job_script_path = os.path.join(job_dir, f"{script_name}_job.sh")
+                job_script_path = os.path.join(job_dir, f"{script_name}_{i}_job.sh")
                 
                 with open(job_script_path, "w") as script:
                     script.write("#!/bin/bash\n")
-                    script.write(f"#SBATCH --job-name={script_name}_job\n")
-                    script.write(f"#SBATCH --output={os.path.join(job_dir, f'{script_name}_output')}\n")
+                    script.write(f"#SBATCH --job-name={script_name}_{i}_job\n")
+                    script.write(f"#SBATCH --output={os.path.join(job_dir, f'{script_name}_{i}_output')}\n")
                     script.write(f"#SBATCH --partition={partition}\n")
                     script.write("#SBATCH --nodes=1\n")
                     script.write("#SBATCH --ntasks=1\n")
-                    script.write("#SBATCH --cpus-per-task=1\n")
+                    script.write(f"#SBATCH --cpus-per-task={threads}\n")
                     script.write(f"#SBATCH --time={time}\n")
                     script.write(f"#SBATCH --mail-user={email}\n")
                     script.write("#SBATCH --mail-type=FAIL\n")
@@ -202,11 +263,11 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
                     script.write("\n")
                     
                     # Add module loading if needed
-                    if not os.path.isabs(caller_path) and caller_path != "bcftools" and caller_path != "gatk":
+                    if not os.path.isabs(caller_path):
                         if variant_caller == "freebayes":
                             script.write("module load freebayes\n")
                         elif variant_caller == "bcftools":
-                            script.write("module load bcftools\n")
+                            script.write("module load bcftools/1.14\n")
                         elif variant_caller == "gatk":
                             script.write("module load gatk\n")
                         script.write("\n")
@@ -217,7 +278,11 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
                 # Make executable
                 os.chmod(job_script_path, 0o755)
                 job_scripts.append(job_script_path)
-                logging.info(f"Created joint variant calling job for {len(bam_files)} samples in region {interval}: {job_script_path}")
+                
+                if is_paired:
+                    logging.info(f"Created joint variant calling job for region {interval} using paired directories: {job_script_path}")
+                else:
+                    logging.info(f"Created variant calling job for {len(bam_files)} samples in region {interval}: {job_script_path}")
                 
                 # Update position for next window
                 position = end
@@ -329,7 +394,7 @@ def merge_vcf_files_jobs_generator(input_dirs, output_dirs, job_dirs,
                 script.write(f"#SBATCH --time={time}\n")
                 script.write(f"#SBATCH --mail-user={email}\n")
                 script.write("#SBATCH --mail-type=FAIL\n")
-                script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
+                script.write(f"#SBATCH H={mem_per_cpu}\n")
                 script.write("\n")
                 
                 # Add module loading if needed

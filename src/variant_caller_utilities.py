@@ -125,14 +125,14 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
     # Default paths for variant callers
     default_paths = {
         "freebayes": "/home/l338m483/.conda/envs/Python2.7/bin/freebayes",
-        "bcftools": "bcftools",
+        "bcftools": "/kuhpc/sw/conda/latest/envs/bioconda/bin/bcftools",
         "gatk": "gatk"
     }
     
     # Default parameters for different callers
     default_params = {
         "freebayes": "-4 --max-coverage=5000",
-        "bcftools": "/kuhpc/sw/conda/latest/envs/bioconda/bin/bcftools",
+        "bcftools": "-Ou -a FORMAT/AD --max-depth 5000",
         "gatk": "HaplotypeCaller --emit-ref-confidence GVCF"
     }
     
@@ -265,7 +265,7 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
                             for path, sample in zip(all_bam_paths, sample_names):
                                 sf.write(f"{path}\t{sample}\n")
                         
-                        call_cmd = (f"{caller_path} mpileup --threads={threads} -Ou -a FORMAT/AD --max-depth 5000 "
+                        call_cmd = (f"{caller_path} mpileup --threads={threads} {caller_params} "
                                 f"-r {interval} -f {reference_fasta} {bam_paths} | "
                                 f"{caller_path} call -mv --samples-file {samples_file} -Ov --threads={threads} -o {output_path}")
                 

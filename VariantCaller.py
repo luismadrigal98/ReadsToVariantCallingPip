@@ -54,8 +54,6 @@ def main():
                             help="Seconds between job status checks")
     common_parser.add_argument("--max-wait-time", type=int, default=86400,
                             help="Maximum seconds to wait for jobs")
-    common_parser.add_argument("--reference", type=str, required=True,
-                            help="Path to reference FASTA file")
     common_parser.add_argument("--regions", type=str, nargs="+", default=["all"],
                             help="Genomic regions to process (e.g., Chr_01 Chr_02)")
     common_parser.add_argument("--window-size", type=int, default=1000000,
@@ -67,6 +65,8 @@ def main():
     # Call command
     call_parser = subparsers.add_parser("call", parents=[common_parser],
                                         help="Run variant calling")
+    call_parser.add_argument("--reference", type=str, required=True,
+                            help="Path to reference FASTA file")
     call_parser.add_argument("--input-dirs", type=str, nargs="+", required=True,
                             help="Directories containing BAM files")
     call_parser.add_argument("--output-dirs", type=str, nargs="+", required=True,
@@ -84,6 +84,8 @@ def main():
     # Joint call command
     joint_parser = subparsers.add_parser("joint-call", parents=[common_parser],
                                         help="Run joint variant calling with paired directories")
+    joint_parser.add_argument("--reference", type=str, required=True,
+                            help="Path to reference FASTA file")
     joint_parser.add_argument("--input-dirs-1", type=str, nargs="+", required=True,
                             help="First set of directories containing BAM files")
     joint_parser.add_argument("--input-dirs-2", type=str, nargs="+", required=True,
@@ -100,7 +102,7 @@ def main():
     joint_parser.add_argument("--caller-params", type=str, default=None,
                             help="Additional parameters for variant caller")
     
-    # Merge command
+    # Merge command)
     merge_parser = subparsers.add_parser("merge", parents=[common_parser],
                                        help="Merge VCF files")
     merge_parser.add_argument("--input-dirs", type=str, nargs="+", required=True,
@@ -176,6 +178,16 @@ def main():
             logging.error("Error: Number of directories must match across all parameters")
             sys.exit(1)
         
+        # Check if the reference exists and create an index if needed
+        if not os.path.exists(args.reference):
+            logging.error(f"Reference file not found: {args.reference}")
+            sys.exit(1)
+        
+        fai_path = args.reference + ".fai"
+        if not os.path.exists(fai_path):
+            logging.info(f"Reference index not found, creating one...")
+            create_fasta_index(args.reference, "samtools")
+            
         # Generate joint variant calling jobs
         jobs = generate_variant_calling_jobs(
             input_dirs=args.input_dirs_1,

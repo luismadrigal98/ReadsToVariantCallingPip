@@ -425,7 +425,7 @@ def merge_vcf_files_jobs_generator(input_dirs, output_dirs, job_dirs,
                 script.write(f"#SBATCH --time={time}\n")
                 script.write(f"#SBATCH --mail-user={email}\n")
                 script.write("#SBATCH --mail-type=FAIL\n")
-                script.write(f"#SBATCH H={mem_per_cpu}\n")
+                script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
                 script.write("\n")
                 
                 # Add module loading if needed

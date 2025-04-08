@@ -246,7 +246,7 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
                             sf.write(f"{paired_bam_path}\t{sample_name}_paired\n")
 
                         # Construct command with mpileup | call pipeline and samples file
-                        call_cmd = (f"{caller_path} mpileup --threads={threads} -S {samples_file} {caller_params} "
+                        call_cmd = (f"{caller_path} mpileup --threads={threads} {caller_params} "
                                 f"-r {interval} -f {reference_fasta} {bam_path} {paired_bam_path} | "
                                 f"{caller_path} call -mv -Ov --threads={threads} -o {output_path}")
                     else:
@@ -269,7 +269,7 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
                             for path, sample in zip(all_bam_paths, sample_names):
                                 sf.write(f"{path}\t{sample}\n")
 
-                        call_cmd = (f"{caller_path} mpileup --threads={threads} -S {samples_file} {caller_params} "
+                        call_cmd = (f"{caller_path} mpileup --threads={threads} {caller_params} "
                                     f"-r {interval} -f {reference_fasta} {bam_paths} | "
                                     f"{caller_path} call -mv -Ov --threads={threads} -o {output_path}")
                 

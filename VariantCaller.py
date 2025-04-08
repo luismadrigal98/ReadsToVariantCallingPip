@@ -124,22 +124,22 @@ def main():
     # Parse arguments
     args = parser.parse_args()
     
-    # Check if the reference exists and create an index if needed
-    if not os.path.exists(args.reference):
-        logging.error(f"Reference file not found: {args.reference}")
-        sys.exit(1)
-    
-    fai_path = args.reference + ".fai"
-    if not os.path.exists(fai_path):
-        logging.info(f"Reference index not found, creating one...")
-        create_fasta_index(args.reference, "samtools")
-    
     # Execute appropriate command
     if args.command == "call":
         if len(args.input_dirs) != len(args.output_dirs) or len(args.input_dirs) != len(args.job_dirs):
             logging.error("Error: Number of input, output, and job directories must match")
             sys.exit(1)
         
+        # Check if the reference exists and create an index if needed
+        if not os.path.exists(args.reference):
+            logging.error(f"Reference file not found: {args.reference}")
+            sys.exit(1)
+        
+        fai_path = args.reference + ".fai"
+        if not os.path.exists(fai_path):
+            logging.info(f"Reference index not found, creating one...")
+            create_fasta_index(args.reference, "samtools")
+
         # Generate variant calling jobs
         jobs = generate_variant_calling_jobs(
             input_dirs=args.input_dirs,

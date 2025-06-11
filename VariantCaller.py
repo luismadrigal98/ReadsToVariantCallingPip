@@ -143,7 +143,7 @@ def main():
         fai_path = args.reference + ".fai"
         if not os.path.exists(fai_path):
             logging.info(f"Reference index not found, creating one...")
-            create_fasta_index(args.reference, "samtools")
+            create_fasta_index(args.reference, args.samtools_path)
 
         # Generate variant calling jobs
         jobs = generate_variant_calling_jobs(
@@ -189,7 +189,7 @@ def main():
         fai_path = args.reference + ".fai"
         if not os.path.exists(fai_path):
             logging.info(f"Reference index not found, creating one...")
-            create_fasta_index(args.reference, arggs.samtools_path)
+            create_fasta_index(args.reference, args.samtools_path)
             
         # Generate joint variant calling jobs
         jobs = generate_variant_calling_jobs(

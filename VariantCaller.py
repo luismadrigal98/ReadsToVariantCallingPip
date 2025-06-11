@@ -80,6 +80,9 @@ def main():
                             help="Path to variant caller executable")
     call_parser.add_argument("--caller-params", type=str, default=None,
                             help="Additional parameters for variant caller")
+    call_parser.add_argument("--samtools-path", type=str,
+                            default="/kuhpc/sw/conda/latest/envs/bioconda/bin/samtools",
+                            help="Path to samtools executable")
     
     # Joint call command
     joint_parser = subparsers.add_parser("joint-call", parents=[common_parser],
@@ -186,7 +189,7 @@ def main():
         fai_path = args.reference + ".fai"
         if not os.path.exists(fai_path):
             logging.info(f"Reference index not found, creating one...")
-            create_fasta_index(args.reference, "samtools")
+            create_fasta_index(args.reference, arggs.samtools_path)
             
         # Generate joint variant calling jobs
         jobs = generate_variant_calling_jobs(

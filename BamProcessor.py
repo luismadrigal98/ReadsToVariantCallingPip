@@ -2,11 +2,7 @@
 """
 BamProcessor.py - A tool for processing BAM files after alignment
 
-This script     workflow_parser.add_argument("--job-dirs", type=str, nargs="+", required=True,
-                                help="Directories for job scripts")
-    workflow_parser.add_argument("--bam-type", type=str, choices=["bwa", "stampy", "all"],
-                                default="all", help="Type of BAM files to merge")
-    workflow_parser.add_argument("--duplicate-mode", type=str,rates three processing steps:
+This script integrates three processing steps:
 1. Merging individual BAM files and sorting the merged file
 2. Optional duplicate processing (preserve, mark, or remove)
 3. Indexing of BAM files for downstream analysis
@@ -252,7 +248,7 @@ def main():
                     if f.endswith("_job.sh") and "indexing" in f
                 ])
             
-            index_job_ids = submit_jobs_with_limit(merge_jobs, args.max_jobs)
+            index_job_ids = submit_jobs_with_limit(index_jobs, args.max_jobs)
             
             if index_job_ids:
                 logging.info("Waiting for indexing jobs to complete...")

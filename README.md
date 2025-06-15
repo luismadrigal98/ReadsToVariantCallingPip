@@ -24,14 +24,14 @@ StampyToFreeBayesPip is a comprehensive genomic alignment and variant calling pi
 - SLURM workload manager
 - Python 2.7 (for Stampy and FreeBayes)
 - The following bioinformatics tools:
-  - fastp
-  - BWA
-  - Stampy
-  - samtools
-  - Picard
-  - FreeBayes
-  - bcftools
-  - GATK (optional)
+  - fastp (v0.23.0 or later)
+  - BWA (v0.7.17 or later)
+  - Stampy (v1.0.32 or later)
+  - samtools (v1.15 or later)
+  - Picard (v2.25.0 or later)
+  - FreeBayes (v1.3.6 or later)
+  - bcftools (v1.15 or later)
+  - GATK (v4.2.0 or later, optional)
 
 ### Setup
 
@@ -200,6 +200,45 @@ Project/
 ├── merged_variants/     # Merged variant files
 └── jobs/                # SLURM job scripts
 ```
+
+## Troubleshooting
+
+### Common Issues
+
+#### fastp Parameter Spacing Error
+**Error**: `option value is invalid: --cut_mean_quality=30-R`
+
+**Solution**: This issue was fixed in version 1.1. Ensure you have the latest version of the pipeline. The fix ensures proper spacing between fastp parameters.
+
+#### SLURM Job Submission Issues
+**Error**: Jobs not submitting or hanging
+
+**Solutions**:
+- Check SLURM partition availability: `sinfo`
+- Verify your job limits: `squeue -u $USER`
+- Ensure paths to executables are correct
+- Check disk space in output directories
+
+#### Import/Module Errors
+**Error**: `Import "fastq_utilities" could not be resolved`
+
+**Solution**: These are typically VS Code warnings and don't affect execution. Ensure the `src/` directory is in the same location as the main scripts.
+
+#### Memory/Time Limit Issues
+**Error**: Jobs killed due to memory or time limits
+
+**Solutions**:
+- Increase `--mem-per-cpu` (default: 5g)
+- Increase `--time` (default: 6:00:00)
+- Reduce `--cpus` if memory per CPU is limiting
+- Use smaller `--window-size` for variant calling
+
+### Getting Help
+
+1. Check job output files for specific error messages
+2. Verify all dependencies are installed and accessible
+3. Ensure reference files are indexed properly
+4. Check file permissions and disk space
 
 ## License
 

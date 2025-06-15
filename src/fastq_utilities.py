@@ -271,7 +271,7 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l33
                 # Generate single-end fastp command (note: no -I or -O parameters)
                 fastp_command = (f"{fastp_path} -w {cpus} "
                                     f"-i {os.path.join(batch_dir, single_file)} "
-                                    f"-o {output_dir}/{out_file} {fastp_control_param}"
+                                    f"-o {output_dir}/{out_file} {fastp_control_param} "
                                     f"-R {os.path.join(output_dir, f'{sample_id}_fastp_report')}")
                 
                 job_script_path = os.path.join(job_dir, f"fastp_single_{sample_id}_job.sh")

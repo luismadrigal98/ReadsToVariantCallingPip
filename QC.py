@@ -72,6 +72,14 @@ def main():
     fastp_parser.add_argument("--fastp-control-param", type=str,  # Change underscore to hyphen
                         default="-3 --complexity_threshold=20 --length_required=50 --cut_window_size=3 --cut_mean_quality=30",
                         help="Control parameters common to single and double end reads. Notice that you must provide an unique string separated by spaces.")
+    fastp_parser.add_argument("--submit", action="store_true",
+                            help="Submit jobs to SLURM")
+    fastp_parser.add_argument("--max-jobs", type=int, default=5000,
+                            help="Maximum number of jobs to submit at once")
+    fastp_parser.add_argument("--check-interval", type=int, default=300,
+                            help="Time between job status checks in seconds (default: 300)")
+    fastp_parser.add_argument("--max-wait-time", type=int, default=86400,
+                            help="Maximum time to wait for jobs in seconds (default: 24 hours)")
 
     # Workflow command (runs all steps)
     workflow_parser = subparsers.add_parser("workflow", parents=[common_parser], 
@@ -128,6 +136,29 @@ def main():
                         fastp_control_param=args.fastp_control_param,
                         partition=args.partition, time=args.time, email=args.email,
                         mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
+        
+        if args.submit:
+            # Submit fastp jobs
+            logging.info("=== Submitting fastp jobs ===")
+            for job_dir in args.job_dirs:
+                fastp_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir) 
+                            if (f.startswith("fastp_paired_") or f.startswith("fastp_single_")) and f.endswith(".sh")]
+                
+                if fastp_jobs:
+                    fastp_job_ids = submit_jobs_with_limit(fastp_jobs, args.max_jobs)
+                    logging.info(f"Submitted {len(fastp_job_ids)} fastp jobs from {job_dir}")
+                    
+                    # Wait for fastp jobs to complete
+                    logging.info(f"Waiting for fastp jobs to complete...")
+                    wait_for_jobs_to_complete(
+                        job_ids=fastp_job_ids,
+                        check_interval=args.check_interval,
+                        max_wait_time=args.max_wait_time
+                    )
+                else:
+                    logging.warning(f"No fastp job scripts found in {job_dir}")
+            
+            logging.info("All fastp jobs completed!")
     
     elif args.command == "workflow":
     # Verify directory counts match

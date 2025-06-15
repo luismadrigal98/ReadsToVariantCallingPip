@@ -210,6 +210,11 @@ Project/
 
 **Solution**: This issue was fixed in version 1.1. Ensure you have the latest version of the pipeline. The fix ensures proper spacing between fastp parameters.
 
+#### BAM Merge Overwrite Error
+**Error**: `File 'sample_merged.bam' exists. Please apply '-f' to overwrite. Abort.`
+
+**Solution**: This issue was fixed by adding the `-f` flag to samtools merge commands. The pipeline now automatically removes corrupted/incomplete files and forces overwrite of existing merged files.
+
 #### SLURM Job Submission Issues
 **Error**: Jobs not submitting or hanging
 

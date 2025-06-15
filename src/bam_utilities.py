@@ -131,7 +131,7 @@ def generate_merge_jobs(input_dirs, output_dirs, job_dirs,
                 
                 # Create commands
                 bam_paths = ' '.join([os.path.join(input_dir, f) for f in sample_files])
-                merging_command = f"{samtools_path} merge -@ {cpus} -o {output_merged} {bam_paths}"
+                merging_command = f"{samtools_path} merge -f -@ {cpus} -o {output_merged} {bam_paths}"
                 sorting_command = f"{samtools_path} sort -@ {cpus} -o {output_sorted} {output_merged}"
                 
                 # Create job script
@@ -154,9 +154,23 @@ def generate_merge_jobs(input_dirs, output_dirs, job_dirs,
                     script.write(f"export PATH=$(dirname {samtools_path}):$PATH\n")
                     script.write(f"cd {input_dir}\n")
                     script.write("\n")
+                    script.write("# Clean up any existing corrupted output files\n")
+                    script.write(f"[ -f {output_merged} ] && rm -f {output_merged}\n")
+                    script.write(f"[ -f {output_sorted} ] && rm -f {output_sorted}\n")
+                    script.write("\n")
+                    script.write("# Merge BAM files\n")
                     script.write(f"{merging_command}\n")
                     script.write("\n")
-                    script.write(f"{sorting_command}\n")
+                    script.write("# Check if merge was successful before sorting\n")
+                    script.write(f"if [ -f {output_merged} ] && [ -s {output_merged} ]; then\n")
+                    script.write(f"    echo 'Merge successful, proceeding with sorting...'\n")
+                    script.write(f"    {sorting_command}\n")
+                    script.write(f"    # Clean up intermediate merged file after successful sort\n")
+                    script.write(f"    [ -f {output_sorted} ] && [ -s {output_sorted} ] && rm -f {output_merged}\n")
+                    script.write(f"else\n")
+                    script.write(f"    echo 'Error: Merge failed or produced empty file'\n")
+                    script.write(f"    exit 1\n")
+                    script.write(f"fi\n")
                 
                 os.chmod(job_script_path, 0o755)
                 logging.info(f"Created merge job script for sample {sample_name} with {len(sample_files)} files: {job_script_path}")

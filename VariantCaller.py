@@ -138,6 +138,8 @@ def main():
                                 help="Path to bcftools executable")
     atomize_parser.add_argument('--verbose', action='store_true',
                                 help="Enable verbose logging")
+    atomize_parser.add_argument('--debug-mode', action='store_true',
+                                help="Enable debug mode. Command is not executed, but the function print the command.")
 
     # Parse arguments
     args = parser.parse_args()
@@ -271,7 +273,8 @@ def main():
             input_file=args.input_file,
             output_file=args.output_file,
             bcftools_path=args.bcftools_path,
-            verbose=args.verbose
+            verbose=args.verbose,
+            debug_mode=args.debug_mode
         )
 
     else:

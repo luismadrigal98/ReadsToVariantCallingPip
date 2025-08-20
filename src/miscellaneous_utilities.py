@@ -10,11 +10,12 @@ import sys
 import logging
 
 
-def atomize_vcf_file(input_file, output_file, bcftools_path="bcftools", verbose = False):
+def atomize_vcf_file(input_file, output_file, bcftools_path="bcftools", verbose = False, debug_mode = False):
     """Atomize a VCF file into individual variant calls."""
     command = [bcftools_path, "norm", "-a", input_file, ">", output_file]
     
     if verbose:
         logging.info(f"Running command: {' '.join(command)}")
     
-    subprocess.run(command, check=False)
+    if not debug_mode:
+        subprocess.run(command, check=False)

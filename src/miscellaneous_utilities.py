@@ -17,4 +17,4 @@ def atomize_vcf_file(input_file, output_file, bcftools_path="bcftools", verbose 
     if verbose:
         logging.info(f"Running command: {' '.join(command)}")
     
-    subprocess.run(command, check=True)
+    subprocess.run(command, check=False)

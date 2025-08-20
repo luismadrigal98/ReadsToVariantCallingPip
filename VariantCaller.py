@@ -115,7 +115,7 @@ def main():
                             help="Directories for merged output")
     merge_parser.add_argument("--job-dirs", type=str, nargs="+", required=True,
                             help="Directories for job scripts")
-    merge_parser.add_argument("--bcftools-path", type=str, 
+    merge_parser.add_argument("--bcftools-path", type=str,
                             default="/kuhpc/sw/conda/latest/envs/bioconda/bin/bcftools",
                             help="Path to bcftools executable")
     merge_parser.add_argument("--merge-command", type=str, default="concat",
@@ -128,7 +128,7 @@ def main():
                             help="Sample names for output files")
     
     # Atomize command
-    atomize_parser = subparsers.add_parser("atomize", parents=[common_parser],
+    atomize_parser = subparsers.add_parser("atomize",
                                             help="Run atomization on input files")
     atomize_parser.add_argument("--input-file", type=str, required=True,
                                 help="Input vcf file to atomize")

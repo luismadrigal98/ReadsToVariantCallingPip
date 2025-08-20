@@ -136,6 +136,8 @@ def main():
                                 help="Output vcf file with atomized variants")
     atomize_parser.add_argument('--bcftools_path', type=str, default='bcftools',
                                 help="Path to bcftools executable")
+    atomize_parser.add_argument('--verbose', action='store_true',
+                                help="Enable verbose logging")
 
     # Parse arguments
     args = parser.parse_args()
@@ -268,7 +270,8 @@ def main():
         atomize_vcf_file(
             input_file=args.input_file,
             output_file=args.output_file,
-            bcftools_path=args.bcftools_path
+            bcftools_path=args.bcftools_path,
+            verbose=args.verbose
         )
 
     else:

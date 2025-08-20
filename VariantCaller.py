@@ -106,7 +106,7 @@ def main():
     joint_parser.add_argument("--caller-params", type=str, default=None,
                             help="Additional parameters for variant caller")
     
-    # Merge command)
+    # Merge command
     merge_parser = subparsers.add_parser("merge", parents=[common_parser],
                                        help="Merge VCF files")
     merge_parser.add_argument("--input-dirs", type=str, nargs="+", required=True,
@@ -127,10 +127,8 @@ def main():
     merge_parser.add_argument("--sample-names", type=str, nargs="+", default=None,
                             help="Sample names for output files")
     
-    # Create subparsers for miscellaneous commands
-    subparsers2 = parser.add_subparsers(dest='command', help='Miscellaneous command to execute')
-
-    atomize_parser = subparsers2.add_parser("atomize", parents=[common_parser],
+    # Atomize command
+    atomize_parser = subparsers.add_parser("atomize", parents=[common_parser],
                                             help="Run atomization on input files")
     atomize_parser.add_argument("--input-file", type=str, required=True,
                                 help="Input vcf file to atomize")

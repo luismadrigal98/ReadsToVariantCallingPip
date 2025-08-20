@@ -28,6 +28,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 # Import utilities
 from variant_caller_utilities import *
 from slurm_utilities import *
+from miscellaneous_utilities import atomize_vcf_file
 
 def main():
     """Main function to parse arguments and execute variant calling."""
@@ -126,6 +127,18 @@ def main():
     merge_parser.add_argument("--sample-names", type=str, nargs="+", default=None,
                             help="Sample names for output files")
     
+    # Create subparsers for miscellaneous commands
+    subparsers2 = parser.add_subparsers(dest='command', help='Miscellaneous command to execute')
+
+    atomize_parser = subparsers2.add_parser("atomize", parents=[common_parser],
+                                            help="Run atomization on input files")
+    atomize_parser.add_argument("--input-file", type=str, required=True,
+                                help="Input vcf file to atomize")
+    atomize_parser.add_argument("--output-file", type=str, required=True,
+                                help="Output vcf file with atomized variants")
+    atomize_parser.add_argument('--bcftools_path', type=str, default='bcftools',
+                                help="Path to bcftools executable")
+
     # Parse arguments
     args = parser.parse_args()
     
@@ -251,7 +264,15 @@ def main():
             wait_for_jobs_to_complete(job_ids, 
                                     check_interval=args.check_interval,
                                     max_wait_time=args.max_wait_time)
-    
+
+    elif args.command == "atomize":
+        # Run atomization
+        atomize_vcf_file(
+            input_file=args.input_file,
+            output_file=args.output_file,
+            bcftools_path=args.bcftools_path
+        )
+
     else:
         parser.print_help()
         sys.exit(1)

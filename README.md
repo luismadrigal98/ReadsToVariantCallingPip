@@ -181,6 +181,7 @@ Common options:
    - Process by chromosomal regions for parallelization
    - Support joint calling across multiple samples
    - Merge region-specific VCF files into cohesive output
+   - (Optional) If only interested in SNP, and you want a clean representation (without context, MNP), you should atomize the variants. For that, you can use the miscellaneous command in VariantCaller called 'atomize'.
 
 ## Directory Structure
 

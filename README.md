@@ -1,8 +1,8 @@
-# StampyToFreeBayesPip: Genomic Alignment and Variant Calling Pipeline
+# ReadsToVariantCallingPip: Genomic Alignment and Variant Calling Pipeline
 
 ## Overview
 
-StampyToFreeBayesPip is a comprehensive genomic alignment and variant calling pipeline designed for high-performance computing environments. It automates the process from raw FASTQ files to variant calls, leveraging BWA and Stampy aligners for improved accuracy, and multiple variant callers (FreeBayes, bcftools, GATK) for sensitive variant detection. The pipeline is optimized for non-model organisms or divergent reference genomes.
+ReadsToVariantCallingPip is a comprehensive genomic alignment and variant calling pipeline designed for high-performance computing environments. It automates the process from raw FASTQ files to variant calls, leveraging BWA and Stampy aligners for improved accuracy, and multiple variant callers (FreeBayes, bcftools, GATK) for sensitive variant detection. The pipeline is optimized for non-model organisms or divergent reference genomes.
 
 ## Features
 

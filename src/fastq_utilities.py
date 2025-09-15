@@ -1,6 +1,8 @@
 """
 Utilities for working with fastq files.
 
+@author: Luis Javier Madrigal-Roca
+
 """
 
 import os
@@ -72,7 +74,6 @@ def get_sample_structure(input_directories):
     
     return samples
 
-
 def generate_split_jobs(input_dirs, output_dirs, job_dirs, lines=4000000, partition="sixhour", 
                         time="6:00:00", email="l338m483@ku.edu", mem_per_cpu="5g", cpus=10):
     """
@@ -133,7 +134,6 @@ def generate_split_jobs(input_dirs, output_dirs, job_dirs, lines=4000000, partit
         except Exception as e:
             logging.error(f"An error occurred: {e}")
 
-
 def generate_compress_jobs(batch_dirs, job_dirs, partition="sixhour", 
                         time="6:00:00", email="l338m483@ku.edu", 
                         mem_per_cpu="5g", cpus=10):
@@ -191,7 +191,6 @@ def generate_compress_jobs(batch_dirs, job_dirs, partition="sixhour",
             logging.error(f"Directory not found: {batch_dir}")
         except Exception as e:
             logging.error(f"An error occurred: {e}")
-
 
 def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l338m483/fastp",
                         fastp_control_param="",

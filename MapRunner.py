@@ -164,19 +164,27 @@ def main():
                         mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:
-            # Submit BWA jobs
+            # Find and submit all BWA jobs from all directories
+            logging.info("=== Submitting BWA jobs from all directories ===")
+            all_bwa_jobs = []
+            
+            # Collect all BWA jobs from all directories
             for job_dir in args.job_dirs:
                 bwa_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir)
                             if f.startswith("bwa_") and f.endswith("_alig_job.sh")]
-                
-                bwa_job_ids = submit_jobs_with_limit(bwa_jobs, args.max_jobs)
-                logging.info(f"Submitted {len(bwa_job_ids)} BWA jobs from {job_dir}")
-                
-                # Wait for BWA jobs to complete
-                logging.info("Waiting for BWA jobs to complete...")
-                wait_for_jobs_to_complete(job_ids=bwa_job_ids, 
-                                        check_interval=args.check_interval,
-                                        max_wait_time=args.max_wait_time)
+                all_bwa_jobs.extend(bwa_jobs)
+                logging.info(f"Found {len(bwa_jobs)} BWA jobs in {job_dir}")
+            
+            # Submit all BWA jobs with limit
+            logging.info(f"Submitting {len(all_bwa_jobs)} total BWA jobs (max concurrent: {args.max_jobs})")
+            bwa_job_ids = submit_jobs_with_limit(all_bwa_jobs, args.max_jobs)
+            logging.info(f"Submitted {len(bwa_job_ids)} BWA jobs from all directories")
+            
+            # Wait for all BWA jobs to complete
+            logging.info("Waiting for all BWA jobs to complete...")
+            wait_for_jobs_to_complete(job_ids=bwa_job_ids, 
+                                    check_interval=args.check_interval,
+                                    max_wait_time=args.max_wait_time)
     
     elif args.command == "sambam":
         if len(args.input_dirs) != len(args.output_dirs) or len(args.input_dirs) != len(args.job_dirs):
@@ -189,19 +197,27 @@ def main():
                                 mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:
-            # Submit SAM to BAM jobs
+            # Find and submit all SAM to BAM jobs from all directories
+            logging.info("=== Submitting SAM to BAM jobs from all directories ===")
+            all_bam_jobs = []
+            
+            # Collect all SAM to BAM jobs from all directories
             for job_dir in args.job_dirs:
                 bam_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir)
                             if f.startswith("bam_") and f.endswith("_sort_job.sh")]
-                
-                bam_job_ids = submit_jobs_with_limit(bam_jobs, args.max_jobs)
-                logging.info(f"Submitted {len(bam_job_ids)} SAM to BAM jobs from {job_dir}")
-                
-                # Wait for SAM to BAM jobs to complete
-                logging.info("Waiting for SAM to BAM jobs to complete...")
-                wait_for_jobs_to_complete(job_ids=bam_job_ids,
-                                        check_interval=args.check_interval,
-                                        max_wait_time=args.max_wait_time)
+                all_bam_jobs.extend(bam_jobs)
+                logging.info(f"Found {len(bam_jobs)} SAM to BAM jobs in {job_dir}")
+            
+            # Submit all SAM to BAM jobs with limit
+            logging.info(f"Submitting {len(all_bam_jobs)} total SAM to BAM jobs (max concurrent: {args.max_jobs})")
+            bam_job_ids = submit_jobs_with_limit(all_bam_jobs, args.max_jobs)
+            logging.info(f"Submitted {len(bam_job_ids)} SAM to BAM jobs from all directories")
+            
+            # Wait for all SAM to BAM jobs to complete
+            logging.info("Waiting for all SAM to BAM jobs to complete...")
+            wait_for_jobs_to_complete(job_ids=bam_job_ids,
+                                    check_interval=args.check_interval,
+                                    max_wait_time=args.max_wait_time)
     
     elif args.command == "stampy":
         if len(args.input_dirs) != len(args.output_dirs) or len(args.input_dirs) != len(args.job_dirs):
@@ -215,19 +231,27 @@ def main():
                     mem_per_cpu=args.mem_per_cpu, cpus=args.stampy_cpus)
         
         if args.submit:
-            # Submit Stampy jobs
+            # Find and submit all Stampy jobs from all directories
+            logging.info("=== Submitting Stampy jobs from all directories ===")
+            all_stampy_jobs = []
+            
+            # Collect all Stampy jobs from all directories
             for job_dir in args.job_dirs:
                 stampy_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir)
                             if f.startswith("stampy_") and f.endswith("_job.sh")]
-                
-                stampy_job_ids = submit_jobs_with_limit(stampy_jobs, args.max_jobs)
-                logging.info(f"Submitted {len(stampy_job_ids)} Stampy jobs from {job_dir}")
-                
-                # Wait for Stampy jobs to complete
-                logging.info("Waiting for Stampy jobs to complete...")
-                wait_for_jobs_to_complete(job_ids=stampy_job_ids,
-                                    check_interval=args.check_interval,
-                                    max_wait_time=args.max_wait_time)
+                all_stampy_jobs.extend(stampy_jobs)
+                logging.info(f"Found {len(stampy_jobs)} Stampy jobs in {job_dir}")
+            
+            # Submit all Stampy jobs with limit
+            logging.info(f"Submitting {len(all_stampy_jobs)} total Stampy jobs (max concurrent: {args.max_jobs})")
+            stampy_job_ids = submit_jobs_with_limit(all_stampy_jobs, args.max_jobs)
+            logging.info(f"Submitted {len(stampy_job_ids)} Stampy jobs from all directories")
+            
+            # Wait for all Stampy jobs to complete
+            logging.info("Waiting for all Stampy jobs to complete...")
+            wait_for_jobs_to_complete(job_ids=stampy_job_ids,
+                                check_interval=args.check_interval,
+                                max_wait_time=args.max_wait_time)
     
     elif args.command == "workflow":
         # Verify directory counts match
@@ -246,20 +270,27 @@ def main():
                         mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:
-            # Submit BWA jobs and wait for completion
-            logging.info("\n=== Submitting BWA jobs ===")
+            # Submit all BWA jobs from all directories and wait for completion
+            logging.info("\n=== Submitting BWA jobs from all directories ===")
+            all_bwa_jobs = []
+            
+            # Collect all BWA jobs from all directories
             for job_dir in args.job_dirs:
                 bwa_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir)
                         if f.startswith("bwa_") and f.endswith("_alig_job.sh")]
-                
-                bwa_job_ids = submit_jobs_with_limit(bwa_jobs, args.max_jobs)
-                logging.info(f"Submitted {len(bwa_job_ids)} BWA jobs from {job_dir}")
-                
-                # Wait for BWA jobs to complete
-                logging.info("Waiting for BWA jobs to complete...")
-                wait_for_jobs_to_complete(job_ids=bwa_job_ids,
-                                    check_interval=args.check_interval,
-                                    max_wait_time=args.max_wait_time)
+                all_bwa_jobs.extend(bwa_jobs)
+                logging.info(f"Found {len(bwa_jobs)} BWA jobs in {job_dir}")
+            
+            # Submit all BWA jobs with limit
+            logging.info(f"Submitting {len(all_bwa_jobs)} total BWA jobs (max concurrent: {args.max_jobs})")
+            bwa_job_ids = submit_jobs_with_limit(all_bwa_jobs, args.max_jobs)
+            logging.info(f"Submitted {len(bwa_job_ids)} BWA jobs from all directories")
+            
+            # Wait for all BWA jobs to complete
+            logging.info("Waiting for all BWA jobs to complete...")
+            wait_for_jobs_to_complete(job_ids=bwa_job_ids,
+                                check_interval=args.check_interval,
+                                max_wait_time=args.max_wait_time)
         
         # STEP 2: SAM to BAM conversion
         logging.info("\n=== STEP 2: Generating SAM to BAM conversion jobs ===")
@@ -269,20 +300,27 @@ def main():
                                 mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:
-            # Submit SAM to BAM jobs and wait for completion
-            logging.info("\n=== Submitting SAM to BAM conversion jobs ===")
+            # Submit all SAM to BAM jobs from all directories and wait for completion
+            logging.info("\n=== Submitting SAM to BAM conversion jobs from all directories ===")
+            all_bam_jobs = []
+            
+            # Collect all SAM to BAM jobs from all directories
             for job_dir in args.job_dirs:
                 bam_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir)
                         if f.startswith("bam_") and f.endswith("_sort_job.sh")]
-                
-                bam_job_ids = submit_jobs_with_limit(bam_jobs, args.max_jobs)
-                logging.info(f"Submitted {len(bam_job_ids)} SAM to BAM jobs from {job_dir}")
-                
-                # Wait for SAM to BAM jobs to complete
-                logging.info("Waiting for SAM to BAM jobs to complete...")
-                wait_for_jobs_to_complete(job_ids=bam_job_ids,
-                                    check_interval=args.check_interval,
-                                    max_wait_time=args.max_wait_time)
+                all_bam_jobs.extend(bam_jobs)
+                logging.info(f"Found {len(bam_jobs)} SAM to BAM jobs in {job_dir}")
+            
+            # Submit all SAM to BAM jobs with limit
+            logging.info(f"Submitting {len(all_bam_jobs)} total SAM to BAM jobs (max concurrent: {args.max_jobs})")
+            bam_job_ids = submit_jobs_with_limit(all_bam_jobs, args.max_jobs)
+            logging.info(f"Submitted {len(bam_job_ids)} SAM to BAM jobs from all directories")
+            
+            # Wait for all SAM to BAM jobs to complete
+            logging.info("Waiting for all SAM to BAM jobs to complete...")
+            wait_for_jobs_to_complete(job_ids=bam_job_ids,
+                                check_interval=args.check_interval,
+                                max_wait_time=args.max_wait_time)
         
         # STEP 3: Stampy processing
         logging.info("\n=== STEP 3: Generating Stampy jobs ===")
@@ -293,20 +331,27 @@ def main():
                         mem_per_cpu=args.mem_per_cpu, cpus=args.stampy_cpus)
         
         if args.submit:
-            # Submit Stampy jobs and wait for completion
-            logging.info("\n=== Submitting Stampy jobs ===")
+            # Submit all Stampy jobs from all directories and wait for completion
+            logging.info("\n=== Submitting Stampy jobs from all directories ===")
+            all_stampy_jobs = []
+            
+            # Collect all Stampy jobs from all directories
             for job_dir in args.job_dirs:
                 stampy_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir)
                             if f.startswith("stampy_") and f.endswith("_job.sh")]
-                
-                stampy_job_ids = submit_jobs_with_limit(stampy_jobs, args.max_jobs)
-                logging.info(f"Submitted {len(stampy_job_ids)} Stampy jobs from {job_dir}")
-                
-                # Wait for Stampy jobs to complete
-                logging.info("Waiting for Stampy jobs to complete...")
-                wait_for_jobs_to_complete(job_ids=stampy_job_ids,
-                                    check_interval=args.check_interval,
-                                    max_wait_time=args.max_wait_time)
+                all_stampy_jobs.extend(stampy_jobs)
+                logging.info(f"Found {len(stampy_jobs)} Stampy jobs in {job_dir}")
+            
+            # Submit all Stampy jobs with limit
+            logging.info(f"Submitting {len(all_stampy_jobs)} total Stampy jobs (max concurrent: {args.max_jobs})")
+            stampy_job_ids = submit_jobs_with_limit(all_stampy_jobs, args.max_jobs)
+            logging.info(f"Submitted {len(stampy_job_ids)} Stampy jobs from all directories")
+            
+            # Wait for all Stampy jobs to complete
+            logging.info("Waiting for all Stampy jobs to complete...")
+            wait_for_jobs_to_complete(job_ids=stampy_job_ids,
+                                check_interval=args.check_interval,
+                                max_wait_time=args.max_wait_time)
             
             logging.info("\nAll alignment jobs have been submitted and completed!")
         else:

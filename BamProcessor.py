@@ -130,18 +130,26 @@ def main():
                             mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:
-            # Find and submit merge jobs
-            merge_jobs = []
+            # Find and submit all merge jobs from all directories
+            logging.info("=== Submitting merge jobs from all directories ===")
+            all_merge_jobs = []
+            
+            # Collect all merge jobs from all directories
             for job_dir in args.job_dirs:
-                merge_jobs.extend([
+                merge_jobs = [
                     os.path.join(job_dir, f) for f in os.listdir(job_dir)
                     if f.endswith("_merge_and_sort_bam_job.sh")
-                ])
+                ]
+                all_merge_jobs.extend(merge_jobs)
+                logging.info(f"Found {len(merge_jobs)} merge jobs in {job_dir}")
             
-            merge_job_ids = submit_jobs_with_limit(merge_jobs, args.max_jobs)
+            # Submit all merge jobs with limit
+            logging.info(f"Submitting {len(all_merge_jobs)} total merge jobs (max concurrent: {args.max_jobs})")
+            merge_job_ids = submit_jobs_with_limit(all_merge_jobs, args.max_jobs)
+            logging.info(f"Submitted {len(merge_job_ids)} merge jobs from all directories")
             
             if merge_job_ids:
-                logging.info("Waiting for merge jobs to complete...")
+                logging.info("Waiting for all merge jobs to complete...")
                 wait_for_jobs_to_complete(merge_job_ids, 
                                         check_interval=args.check_interval,
                                         max_wait_time=args.max_wait_time)
@@ -158,18 +166,26 @@ def main():
                                             mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:
-            # Find and submit duplicate processing jobs
-            dedup_jobs = []
+            # Find and submit all duplicate processing jobs from all directories
+            logging.info("=== Submitting duplicate processing jobs from all directories ===")
+            all_dedup_jobs = []
+            
+            # Collect all dedup jobs from all directories
             for job_dir in args.job_dirs:
-                dedup_jobs.extend([
+                dedup_jobs = [
                     os.path.join(job_dir, f) for f in os.listdir(job_dir)
                     if f.endswith("_duplicate_processing_job.sh")
-                ])
+                ]
+                all_dedup_jobs.extend(dedup_jobs)
+                logging.info(f"Found {len(dedup_jobs)} duplicate processing jobs in {job_dir}")
             
-            dedup_job_ids = submit_jobs_with_limit(dedup_jobs, args.max_jobs)
+            # Submit all dedup jobs with limit
+            logging.info(f"Submitting {len(all_dedup_jobs)} total duplicate processing jobs (max concurrent: {args.max_jobs})")
+            dedup_job_ids = submit_jobs_with_limit(all_dedup_jobs, args.max_jobs)
+            logging.info(f"Submitted {len(dedup_job_ids)} duplicate processing jobs from all directories")
             
             if dedup_job_ids:
-                logging.info("Waiting for duplicate processing jobs to complete...")
+                logging.info("Waiting for all duplicate processing jobs to complete...")
                 wait_for_jobs_to_complete(dedup_job_ids, 
                                         check_interval=args.check_interval,
                                         max_wait_time=args.max_wait_time)
@@ -185,18 +201,26 @@ def main():
                                 mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:
-            # Find and submit indexing jobs
-            index_jobs = []
+            # Find and submit all indexing jobs from all directories
+            logging.info("=== Submitting indexing jobs from all directories ===")
+            all_index_jobs = []
+            
+            # Collect all index jobs from all directories
             for job_dir in args.job_dirs:
-                index_jobs.extend([
+                index_jobs = [
                     os.path.join(job_dir, f) for f in os.listdir(job_dir)
                     if f.endswith("_job.sh") and "indexing" in f
-                ])
+                ]
+                all_index_jobs.extend(index_jobs)
+                logging.info(f"Found {len(index_jobs)} indexing jobs in {job_dir}")
             
-            index_job_ids = submit_jobs_with_limit(index_jobs, args.max_jobs)
+            # Submit all index jobs with limit
+            logging.info(f"Submitting {len(all_index_jobs)} total indexing jobs (max concurrent: {args.max_jobs})")
+            index_job_ids = submit_jobs_with_limit(all_index_jobs, args.max_jobs)
+            logging.info(f"Submitted {len(index_job_ids)} indexing jobs from all directories")
             
             if index_job_ids:
-                logging.info("Waiting for indexing jobs to complete...")
+                logging.info("Waiting for all indexing jobs to complete...")
                 wait_for_jobs_to_complete(index_job_ids, 
                                         check_interval=args.check_interval,
                                         max_wait_time=args.max_wait_time)
@@ -217,18 +241,26 @@ def main():
                             mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:
-            # Find and submit merge jobs
-            merge_jobs = []
+            # Find and submit all merge jobs from all directories
+            logging.info("=== Submitting merge jobs from all directories ===")
+            all_merge_jobs = []
+            
+            # Collect all merge jobs from all directories
             for job_dir in args.job_dirs:
-                merge_jobs.extend([
+                merge_jobs = [
                     os.path.join(job_dir, f) for f in os.listdir(job_dir)
                     if f.endswith("_merge_and_sort_bam_job.sh")
-                ])
+                ]
+                all_merge_jobs.extend(merge_jobs)
+                logging.info(f"Found {len(merge_jobs)} merge jobs in {job_dir}")
             
-            merge_job_ids = submit_jobs_with_limit(merge_jobs, args.max_jobs)
+            # Submit all merge jobs with limit
+            logging.info(f"Submitting {len(all_merge_jobs)} total merge jobs (max concurrent: {args.max_jobs})")
+            merge_job_ids = submit_jobs_with_limit(all_merge_jobs, args.max_jobs)
+            logging.info(f"Submitted {len(merge_job_ids)} merge jobs from all directories")
             
             if merge_job_ids:
-                logging.info("Waiting for merge jobs to complete...")
+                logging.info("Waiting for all merge jobs to complete...")
                 wait_for_jobs_to_complete(merge_job_ids, 
                                         check_interval=args.check_interval,
                                         max_wait_time=args.max_wait_time)
@@ -240,18 +272,26 @@ def main():
                                 mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:
-            # Find and submit indexing jobs for merged files
-            index_jobs = []
+            # Find and submit all indexing jobs for merged files from all directories
+            logging.info("=== Submitting indexing jobs for merged files from all directories ===")
+            all_index_jobs = []
+            
+            # Collect all index jobs from all directories
             for job_dir in args.job_dirs:
-                index_jobs.extend([
+                index_jobs = [
                     os.path.join(job_dir, f) for f in os.listdir(job_dir)
                     if f.endswith("_job.sh") and "indexing" in f
-                ])
+                ]
+                all_index_jobs.extend(index_jobs)
+                logging.info(f"Found {len(index_jobs)} indexing jobs in {job_dir}")
             
-            index_job_ids = submit_jobs_with_limit(index_jobs, args.max_jobs)
+            # Submit all index jobs with limit
+            logging.info(f"Submitting {len(all_index_jobs)} total indexing jobs (max concurrent: {args.max_jobs})")
+            index_job_ids = submit_jobs_with_limit(all_index_jobs, args.max_jobs)
+            logging.info(f"Submitted {len(index_job_ids)} indexing jobs from all directories")
             
             if index_job_ids:
-                logging.info("Waiting for indexing jobs to complete...")
+                logging.info("Waiting for all indexing jobs to complete...")
                 wait_for_jobs_to_complete(index_job_ids, 
                                         check_interval=args.check_interval,
                                         max_wait_time=args.max_wait_time)
@@ -264,18 +304,26 @@ def main():
                                             mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:
-            # Find and submit duplicate processing jobs
-            dedup_jobs = []
+            # Find and submit all duplicate processing jobs from all directories
+            logging.info("=== Submitting duplicate processing jobs from all directories ===")
+            all_dedup_jobs = []
+            
+            # Collect all dedup jobs from all directories
             for job_dir in args.job_dirs:
-                dedup_jobs.extend([
+                dedup_jobs = [
                     os.path.join(job_dir, f) for f in os.listdir(job_dir)
                     if f.endswith("_duplicate_processing_job.sh")
-                ])
+                ]
+                all_dedup_jobs.extend(dedup_jobs)
+                logging.info(f"Found {len(dedup_jobs)} duplicate processing jobs in {job_dir}")
             
-            dedup_job_ids = submit_jobs_with_limit(dedup_jobs, args.max_jobs)
+            # Submit all dedup jobs with limit
+            logging.info(f"Submitting {len(all_dedup_jobs)} total duplicate processing jobs (max concurrent: {args.max_jobs})")
+            dedup_job_ids = submit_jobs_with_limit(all_dedup_jobs, args.max_jobs)
+            logging.info(f"Submitted {len(dedup_job_ids)} duplicate processing jobs from all directories")
             
             if dedup_job_ids:
-                logging.info("Waiting for duplicate processing jobs to complete...")
+                logging.info("Waiting for all duplicate processing jobs to complete...")
                 wait_for_jobs_to_complete(dedup_job_ids, 
                                         check_interval=args.check_interval,
                                         max_wait_time=args.max_wait_time)
@@ -314,19 +362,29 @@ def main():
                                 mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:
-            # Find and submit indexing jobs for processed files
-            index_jobs = []
+            # Find and submit all indexing jobs for processed files from all directories
+            logging.info("=== Submitting indexing jobs for processed files from all directories ===")
+            all_final_index_jobs = []
+            
+            # Collect all final index jobs from all directories
             for job_dir in args.job_dirs:
                 new_index_jobs = [
                     os.path.join(job_dir, f) for f in os.listdir(job_dir)
-                    if f.endswith("_job.sh") and "indexing" in f and not f in index_jobs
+                    if f.endswith("_job.sh") and "indexing" in f
                 ]
-                index_jobs.extend(new_index_jobs)
+                # Filter out jobs that were already submitted in previous steps
+                for job in new_index_jobs:
+                    if job not in all_final_index_jobs:
+                        all_final_index_jobs.append(job)
+                logging.info(f"Found {len(new_index_jobs)} total indexing jobs in {job_dir}")
             
-            index_job_ids = submit_jobs_with_limit(index_jobs, args.max_jobs)
+            # Submit all final index jobs with limit
+            logging.info(f"Submitting {len(all_final_index_jobs)} total final indexing jobs (max concurrent: {args.max_jobs})")
+            index_job_ids = submit_jobs_with_limit(all_final_index_jobs, args.max_jobs)
+            logging.info(f"Submitted {len(index_job_ids)} final indexing jobs from all directories")
             
             if index_job_ids:
-                logging.info("Waiting for indexing jobs to complete...")
+                logging.info("Waiting for all final indexing jobs to complete...")
                 wait_for_jobs_to_complete(index_job_ids, 
                                         check_interval=args.check_interval,
                                         max_wait_time=args.max_wait_time)

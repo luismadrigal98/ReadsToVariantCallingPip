@@ -29,7 +29,7 @@ from slurm_utilities import *
 default_python=os.path.expanduser("~/.conda/envs/Python2.7/bin/python")
 
 def main():
-    parser = argparse.ArgumentParser(description="Alignment pipeline using BWA and Stampy")
+    parser = argparse.ArgumentParser(description="Alignment pipeline using BWA and Stampy (optional)")
     
     # Common arguments
     common_parser = argparse.ArgumentParser(add_help=False)
@@ -47,7 +47,7 @@ def main():
                             help="Automatically submit jobs after generation")
     common_parser.add_argument("--max-jobs", type=int, default=5000,
                             help="Maximum number of jobs to have in queue at once")
-    common_parser.add_argument("--check-interval", type=int, default=300,
+    common_parser.add_argument("--check-interval", type=int, default=4000,
                             help="Time between job status checks in seconds")
     common_parser.add_argument("--max-wait-time", type=int, default=86400,
                             help="Maximum time to wait for jobs in seconds (default: 24 hours)")
@@ -103,7 +103,7 @@ def main():
     
     # Workflow command (runs all steps)
     workflow_parser = subparsers.add_parser("workflow", parents=[common_parser], 
-                                        help="Run complete workflow (BWA, SAM to BAM, Stampy)")
+                                        help="Run complete workflow (BWA, SAM to BAM, Stampy). Notice that if you were to run the pipeline without Stampy, you can just run BWA and then convert SAM to BAM.")
     workflow_parser.add_argument("--input-dirs", type=str, nargs="+", required=True,
                             help="Directories containing preprocessed FASTQ files")
     workflow_parser.add_argument("--bwa-dirs", type=str, nargs="+", required=True,

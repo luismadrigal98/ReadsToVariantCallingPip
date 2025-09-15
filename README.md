@@ -85,7 +85,7 @@ Calls variants using multiple variant callers and merges results across regions.
 
 ```bash
 # Run complete alignment workflow
-./StampyRunner.py workflow \
+./MapRunner.py workflow \
   --input-dirs /path/to/preprocessed/dir1 /path/to/preprocessed/dir2 \
   --bwa-dirs /path/to/bwa/dir1 /path/to/bwa/dir2 \
   --bam-dirs /path/to/bam/dir1 /path/to/bam/dir2 \

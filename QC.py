@@ -3,7 +3,7 @@
 """
 This program will be used to run fastp over a set of fastq files on a high performance cluster.
 
-This essentially will be a wrapper script that will integrate all required steps from preprocessing of fastq files prior to
+This essentially will be a wrapper script that will integrate all required steps for the preprocessing of fastq files prior to
 the mapping step using fastp.
 
 Author: Luis Javier Madrigal-Roca
@@ -173,22 +173,29 @@ def main():
                         mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:
-            # Submit split jobs and wait for completion
-            logging.info("\n=== Submitting split jobs ===")
+            # Submit split jobs from all directories and wait for completion
+            logging.info("\n=== Submitting split jobs from all directories ===")
+            all_split_jobs = []
+            
+            # Collect all split jobs from all directories
             for job_dir in args.job_dirs:
                 split_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir) 
                             if f.startswith("Split_") and f.endswith(".sh")]
-                
-                split_job_ids = submit_jobs_with_limit(split_jobs, args.max_jobs)
-                logging.info(f"Submitted {len(split_job_ids)} split jobs from {job_dir}")
-                
-                # Wait for split jobs to complete
-                logging.info(f"Waiting for split jobs to complete...")
-                wait_for_jobs_to_complete(
-                    job_ids=split_job_ids,
-                    check_interval=args.check_interval,
-                    max_wait_time=args.max_wait_time
-                )
+                all_split_jobs.extend(split_jobs)
+                logging.info(f"Found {len(split_jobs)} split jobs in {job_dir}")
+            
+            # Submit all split jobs with limit
+            logging.info(f"Submitting {len(all_split_jobs)} total split jobs (max concurrent: {args.max_jobs})")
+            all_split_job_ids = submit_jobs_with_limit(all_split_jobs, args.max_jobs)
+            logging.info(f"Submitted {len(all_split_job_ids)} split jobs from all directories")
+            
+            # Wait for all split jobs to complete
+            logging.info(f"Waiting for all split jobs to complete...")
+            wait_for_jobs_to_complete(
+                job_ids=all_split_job_ids,
+                check_interval=args.check_interval,
+                max_wait_time=args.max_wait_time
+            )
         
         # STEP 2: Generate compression jobs AFTER split is done
         logging.info("\n=== STEP 2: Generating compression jobs ===")
@@ -197,22 +204,29 @@ def main():
                             cpus=args.cpus)
         
         if args.submit:
-            # Submit compression jobs and wait for completion
-            logging.info("\n=== Submitting compression jobs ===")
+            # Submit compression jobs from all directories and wait for completion
+            logging.info("\n=== Submitting compression jobs from all directories ===")
+            all_compress_jobs = []
+            
+            # Collect all compression jobs from all directories
             for job_dir in args.job_dirs:
                 compress_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir) 
                                 if f.startswith("gzip_in_batch_") and f.endswith("_compress_job.sh")]
-                
-                compress_job_ids = submit_jobs_with_limit(compress_jobs, args.max_jobs)
-                logging.info(f"Submitted {len(compress_job_ids)} compression jobs from {job_dir}")
-                
-                # Wait for compression jobs to complete
-                logging.info(f"Waiting for compression jobs to complete...")
-                wait_for_jobs_to_complete(
-                    job_ids=compress_job_ids,
-                    check_interval=args.check_interval,
-                    max_wait_time=args.max_wait_time
-                )
+                all_compress_jobs.extend(compress_jobs)
+                logging.info(f"Found {len(compress_jobs)} compression jobs in {job_dir}")
+            
+            # Submit all compression jobs with limit
+            logging.info(f"Submitting {len(all_compress_jobs)} total compression jobs (max concurrent: {args.max_jobs})")
+            all_compress_job_ids = submit_jobs_with_limit(all_compress_jobs, args.max_jobs)
+            logging.info(f"Submitted {len(all_compress_job_ids)} compression jobs from all directories")
+            
+            # Wait for all compression jobs to complete
+            logging.info(f"Waiting for all compression jobs to complete...")
+            wait_for_jobs_to_complete(
+                job_ids=all_compress_job_ids,
+                check_interval=args.check_interval,
+                max_wait_time=args.max_wait_time
+            )
         
         # STEP 3: Generate fastp jobs AFTER compression is done
         logging.info("\n=== STEP 3: Generating fastp jobs ===")
@@ -222,22 +236,29 @@ def main():
                         mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:
-            # Submit fastp jobs
-            logging.info("\n=== Submitting fastp jobs ===")
+            # Submit fastp jobs from all directories and wait for completion
+            logging.info("\n=== Submitting fastp jobs from all directories ===")
+            all_fastp_jobs = []
+            
+            # Collect all fastp jobs from all directories
             for job_dir in args.job_dirs:
                 fastp_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir) 
                             if (f.startswith("fastp_paired_") or f.startswith("fastp_single_")) and f.endswith(".sh")]
-                
-                fastp_job_ids = submit_jobs_with_limit(fastp_jobs, args.max_jobs)
-                logging.info(f"Submitted {len(fastp_job_ids)} fastp jobs from {job_dir}")
-                
-                # Wait for fastp jobs to complete (optional)
-                logging.info(f"Waiting for fastp jobs to complete...")
-                wait_for_jobs_to_complete(
-                    job_ids=fastp_job_ids,
-                    check_interval=args.check_interval,
-                    max_wait_time=args.max_wait_time
-                )
+                all_fastp_jobs.extend(fastp_jobs)
+                logging.info(f"Found {len(fastp_jobs)} fastp jobs in {job_dir}")
+            
+            # Submit all fastp jobs with limit
+            logging.info(f"Submitting {len(all_fastp_jobs)} total fastp jobs (max concurrent: {args.max_jobs})")
+            all_fastp_job_ids = submit_jobs_with_limit(all_fastp_jobs, args.max_jobs)
+            logging.info(f"Submitted {len(all_fastp_job_ids)} fastp jobs from all directories")
+            
+            # Wait for all fastp jobs to complete
+            logging.info(f"Waiting for all fastp jobs to complete...")
+            wait_for_jobs_to_complete(
+                job_ids=all_fastp_job_ids,
+                check_interval=args.check_interval,
+                max_wait_time=args.max_wait_time
+            )
             
             logging.info("\nAll jobs have been submitted and completed!")
         else:

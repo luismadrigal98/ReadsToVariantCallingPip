@@ -51,6 +51,18 @@ def main():
                             help="Directories for job scripts")
     split_parser.add_argument("--lines", type=int, default=4000000,
                             help="Number of lines per split file (default: 4000000)")
+    split_parser.add_argument("--submit", action="store_true",
+                            help="Submit jobs to SLURM")
+    split_parser.add_argument("--max-jobs", type=int, default=5000,
+                            help="Maximum number of jobs to submit at once")
+    split_parser.add_argument("--check-interval", type=int, default=300,
+                            help="Time between job status checks in seconds")
+    split_parser.add_argument("--max-wait-time", type=int, default=86400,
+                            help="Maximum time to wait for jobs in seconds")
+    split_parser.add_argument("--max-retries", type=int, default=1,
+                            help="Maximum number of retry attempts for failed jobs")
+    split_parser.add_argument("--abort-on-failure", action="store_true",
+                            help="Abort if jobs fail after retries")
     
     # Compress command
     compress_parser = subparsers.add_parser("compress", parents=[common_parser], help="Compress split FASTQ files")
@@ -58,6 +70,18 @@ def main():
                             help="Directories containing split files")
     compress_parser.add_argument("--job-dirs", type=str, nargs="+", required=True,
                             help="Directories for job scripts")
+    compress_parser.add_argument("--submit", action="store_true",
+                            help="Submit jobs to SLURM")
+    compress_parser.add_argument("--max-jobs", type=int, default=5000,
+                            help="Maximum number of jobs to submit at once")
+    compress_parser.add_argument("--check-interval", type=int, default=300,
+                            help="Time between job status checks in seconds")
+    compress_parser.add_argument("--max-wait-time", type=int, default=86400,
+                            help="Maximum time to wait for jobs in seconds")
+    compress_parser.add_argument("--max-retries", type=int, default=1,
+                            help="Maximum number of retry attempts for failed jobs")
+    compress_parser.add_argument("--abort-on-failure", action="store_true",
+                            help="Abort if jobs fail after retries")
     
     # Fastp command
     fastp_parser = subparsers.add_parser("fastp", parents=[common_parser], help="Run fastp on FASTQ files")
@@ -123,6 +147,37 @@ def main():
         generate_split_jobs(args.input_dirs, args.output_dirs, args.job_dirs, lines=args.lines,
                         partition=args.partition, time=args.time, email=args.email, 
                         mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
+        
+        if args.submit:
+            # Submit split jobs with retry capability
+            logging.info("=== Submitting split jobs from all directories ===")
+            all_split_jobs = []
+            
+            # Collect all split jobs from all directories
+            for job_dir in args.job_dirs:
+                split_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir) 
+                            if f.startswith("Split_") and f.endswith(".sh")]
+                all_split_jobs.extend(split_jobs)
+                logging.info(f"Found {len(split_jobs)} split jobs in {job_dir}")
+            
+            # Submit split jobs with retry
+            logging.info(f"Submitting {len(all_split_jobs)} total split jobs with retry capability")
+            result = submit_jobs_with_retry(
+                job_scripts=all_split_jobs,
+                max_jobs=args.max_jobs,
+                max_retries=args.max_retries,
+                check_interval=args.check_interval,
+                max_wait_time=args.max_wait_time
+            )
+            
+            if not result['all_successful']:
+                error_msg = f"Split jobs failed: {len(result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
+                logging.error(error_msg)
+                if args.abort_on_failure:
+                    logging.error("Aborting due to split failures")
+                    sys.exit(1)
+            else:
+                logging.info("All split jobs completed successfully")
     
     elif args.command == "compress":
         if len(args.batch_dirs) != len(args.job_dirs):
@@ -131,6 +186,37 @@ def main():
         generate_compress_jobs(args.batch_dirs, args.job_dirs, partition=args.partition,
                             time=args.time, email=args.email, mem_per_cpu=args.mem_per_cpu,
                             cpus=args.cpus)
+        
+        if args.submit:
+            # Submit compression jobs with retry capability
+            logging.info("=== Submitting compression jobs from all directories ===")
+            all_compress_jobs = []
+            
+            # Collect all compression jobs from all directories
+            for job_dir in args.job_dirs:
+                compress_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir) 
+                                if f.startswith("gzip_in_batch_") and f.endswith("_compress_job.sh")]
+                all_compress_jobs.extend(compress_jobs)
+                logging.info(f"Found {len(compress_jobs)} compression jobs in {job_dir}")
+            
+            # Submit compression jobs with retry
+            logging.info(f"Submitting {len(all_compress_jobs)} total compression jobs with retry capability")
+            result = submit_jobs_with_retry(
+                job_scripts=all_compress_jobs,
+                max_jobs=args.max_jobs,
+                max_retries=args.max_retries,
+                check_interval=args.check_interval,
+                max_wait_time=args.max_wait_time
+            )
+            
+            if not result['all_successful']:
+                error_msg = f"Compression jobs failed: {len(result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
+                logging.error(error_msg)
+                if args.abort_on_failure:
+                    logging.error("Aborting due to compression failures")
+                    sys.exit(1)
+            else:
+                logging.info("All compression jobs completed successfully")
     
     elif args.command == "fastp":
         if len(args.batch_dirs) != len(args.output_dirs) or len(args.batch_dirs) != len(args.job_dirs):
@@ -142,25 +228,35 @@ def main():
                         mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:
-            # Submit fastp jobs
-            logging.info("=== Submitting fastp jobs ===")
+            # Submit fastp jobs with retry capability
+            logging.info("=== Submitting fastp jobs from all directories ===")
+            all_fastp_jobs = []
+            
+            # Collect all fastp jobs from all directories
             for job_dir in args.job_dirs:
                 fastp_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir) 
                             if (f.startswith("fastp_paired_") or f.startswith("fastp_single_")) and f.endswith(".sh")]
-                
-                if fastp_jobs:
-                    fastp_job_ids = submit_jobs_with_limit(fastp_jobs, args.max_jobs)
-                    logging.info(f"Submitted {len(fastp_job_ids)} fastp jobs from {job_dir}")
-                    
-                    # Wait for fastp jobs to complete
-                    logging.info(f"Waiting for fastp jobs to complete...")
-                    wait_for_jobs_to_complete(
-                        job_ids=fastp_job_ids,
-                        check_interval=args.check_interval,
-                        max_wait_time=args.max_wait_time
-                    )
-                else:
-                    logging.warning(f"No fastp job scripts found in {job_dir}")
+                all_fastp_jobs.extend(fastp_jobs)
+                logging.info(f"Found {len(fastp_jobs)} fastp jobs in {job_dir}")
+            
+            # Submit fastp jobs with retry
+            logging.info(f"Submitting {len(all_fastp_jobs)} total fastp jobs with retry capability")
+            result = submit_jobs_with_retry(
+                job_scripts=all_fastp_jobs,
+                max_jobs=args.max_jobs,
+                max_retries=args.max_retries,
+                check_interval=args.check_interval,
+                max_wait_time=args.max_wait_time
+            )
+            
+            if not result['all_successful']:
+                error_msg = f"Fastp jobs failed: {len(result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
+                logging.error(error_msg)
+                if args.abort_on_failure:
+                    logging.error("Aborting due to fastp failures")
+                    sys.exit(1)
+            else:
+                logging.info("All fastp jobs completed successfully")
             
             logging.info("All fastp jobs completed!")
     

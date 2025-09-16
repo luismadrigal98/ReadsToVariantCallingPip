@@ -51,6 +51,10 @@ def main():
                             help="Time between job status checks in seconds")
     common_parser.add_argument("--max-wait-time", type=int, default=86400,
                             help="Maximum time to wait for jobs in seconds (default: 24 hours)")
+    common_parser.add_argument("--max-retries", type=int, default=1,
+                            help="Maximum number of retry attempts for failed jobs")
+    common_parser.add_argument("--abort-on-failure", action="store_true",
+                            help="Abort workflow if jobs fail after retries")
     
     # Subparsers for different commands
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
@@ -164,7 +168,7 @@ def main():
                         mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:
-            # Find and submit all BWA jobs from all directories
+            # Find and submit all BWA jobs from all directories with retry capability
             logging.info("=== Submitting BWA jobs from all directories ===")
             all_bwa_jobs = []
             
@@ -175,16 +179,24 @@ def main():
                 all_bwa_jobs.extend(bwa_jobs)
                 logging.info(f"Found {len(bwa_jobs)} BWA jobs in {job_dir}")
             
-            # Submit all BWA jobs with limit
-            logging.info(f"Submitting {len(all_bwa_jobs)} total BWA jobs (max concurrent: {args.max_jobs})")
-            bwa_job_ids = submit_jobs_with_limit(all_bwa_jobs, args.max_jobs)
-            logging.info(f"Submitted {len(bwa_job_ids)} BWA jobs from all directories")
+            # Submit BWA jobs with retry
+            logging.info(f"Submitting {len(all_bwa_jobs)} total BWA jobs with retry capability")
+            bwa_result = submit_jobs_with_retry(
+                job_scripts=all_bwa_jobs,
+                max_jobs=args.max_jobs,
+                max_retries=args.max_retries,
+                check_interval=args.check_interval,
+                max_wait_time=args.max_wait_time
+            )
             
-            # Wait for all BWA jobs to complete
-            logging.info("Waiting for all BWA jobs to complete...")
-            wait_for_jobs_to_complete(job_ids=bwa_job_ids, 
-                                    check_interval=args.check_interval,
-                                    max_wait_time=args.max_wait_time)
+            if not bwa_result['all_successful']:
+                error_msg = f"BWA jobs failed: {len(bwa_result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
+                logging.error(error_msg)
+                if args.abort_on_failure:
+                    logging.error("Aborting due to BWA failures")
+                    sys.exit(1)
+            else:
+                logging.info("All BWA jobs completed successfully")
     
     elif args.command == "sambam":
         if len(args.input_dirs) != len(args.output_dirs) or len(args.input_dirs) != len(args.job_dirs):
@@ -197,7 +209,7 @@ def main():
                                 mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:
-            # Find and submit all SAM to BAM jobs from all directories
+            # Find and submit all SAM to BAM jobs from all directories with retry capability
             logging.info("=== Submitting SAM to BAM jobs from all directories ===")
             all_bam_jobs = []
             
@@ -208,16 +220,24 @@ def main():
                 all_bam_jobs.extend(bam_jobs)
                 logging.info(f"Found {len(bam_jobs)} SAM to BAM jobs in {job_dir}")
             
-            # Submit all SAM to BAM jobs with limit
-            logging.info(f"Submitting {len(all_bam_jobs)} total SAM to BAM jobs (max concurrent: {args.max_jobs})")
-            bam_job_ids = submit_jobs_with_limit(all_bam_jobs, args.max_jobs)
-            logging.info(f"Submitted {len(bam_job_ids)} SAM to BAM jobs from all directories")
+            # Submit SAM to BAM jobs with retry
+            logging.info(f"Submitting {len(all_bam_jobs)} total SAM to BAM jobs with retry capability")
+            bam_result = submit_jobs_with_retry(
+                job_scripts=all_bam_jobs,
+                max_jobs=args.max_jobs,
+                max_retries=args.max_retries,
+                check_interval=args.check_interval,
+                max_wait_time=args.max_wait_time
+            )
             
-            # Wait for all SAM to BAM jobs to complete
-            logging.info("Waiting for all SAM to BAM jobs to complete...")
-            wait_for_jobs_to_complete(job_ids=bam_job_ids,
-                                    check_interval=args.check_interval,
-                                    max_wait_time=args.max_wait_time)
+            if not bam_result['all_successful']:
+                error_msg = f"SAM to BAM jobs failed: {len(bam_result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
+                logging.error(error_msg)
+                if args.abort_on_failure:
+                    logging.error("Aborting due to SAM to BAM failures")
+                    sys.exit(1)
+            else:
+                logging.info("All SAM to BAM jobs completed successfully")
     
     elif args.command == "stampy":
         if len(args.input_dirs) != len(args.output_dirs) or len(args.input_dirs) != len(args.job_dirs):
@@ -231,7 +251,7 @@ def main():
                     mem_per_cpu=args.mem_per_cpu, cpus=args.stampy_cpus)
         
         if args.submit:
-            # Find and submit all Stampy jobs from all directories
+            # Find and submit all Stampy jobs from all directories with retry capability
             logging.info("=== Submitting Stampy jobs from all directories ===")
             all_stampy_jobs = []
             
@@ -242,16 +262,24 @@ def main():
                 all_stampy_jobs.extend(stampy_jobs)
                 logging.info(f"Found {len(stampy_jobs)} Stampy jobs in {job_dir}")
             
-            # Submit all Stampy jobs with limit
-            logging.info(f"Submitting {len(all_stampy_jobs)} total Stampy jobs (max concurrent: {args.max_jobs})")
-            stampy_job_ids = submit_jobs_with_limit(all_stampy_jobs, args.max_jobs)
-            logging.info(f"Submitted {len(stampy_job_ids)} Stampy jobs from all directories")
+            # Submit Stampy jobs with retry
+            logging.info(f"Submitting {len(all_stampy_jobs)} total Stampy jobs with retry capability")
+            stampy_result = submit_jobs_with_retry(
+                job_scripts=all_stampy_jobs,
+                max_jobs=args.max_jobs,
+                max_retries=args.max_retries,
+                check_interval=args.check_interval,
+                max_wait_time=args.max_wait_time
+            )
             
-            # Wait for all Stampy jobs to complete
-            logging.info("Waiting for all Stampy jobs to complete...")
-            wait_for_jobs_to_complete(job_ids=stampy_job_ids,
-                                check_interval=args.check_interval,
-                                max_wait_time=args.max_wait_time)
+            if not stampy_result['all_successful']:
+                error_msg = f"Stampy jobs failed: {len(stampy_result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
+                logging.error(error_msg)
+                if args.abort_on_failure:
+                    logging.error("Aborting due to Stampy failures")
+                    sys.exit(1)
+            else:
+                logging.info("All Stampy jobs completed successfully")
     
     elif args.command == "workflow":
         # Verify directory counts match
@@ -270,7 +298,7 @@ def main():
                         mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:
-            # Submit all BWA jobs from all directories and wait for completion
+            # Submit all BWA jobs from all directories with retry capability
             logging.info("\n=== Submitting BWA jobs from all directories ===")
             all_bwa_jobs = []
             
@@ -281,16 +309,26 @@ def main():
                 all_bwa_jobs.extend(bwa_jobs)
                 logging.info(f"Found {len(bwa_jobs)} BWA jobs in {job_dir}")
             
-            # Submit all BWA jobs with limit
-            logging.info(f"Submitting {len(all_bwa_jobs)} total BWA jobs (max concurrent: {args.max_jobs})")
-            bwa_job_ids = submit_jobs_with_limit(all_bwa_jobs, args.max_jobs)
-            logging.info(f"Submitted {len(bwa_job_ids)} BWA jobs from all directories")
+            # Submit BWA jobs with retry
+            logging.info(f"Submitting {len(all_bwa_jobs)} total BWA jobs with retry capability")
+            bwa_result = submit_jobs_with_retry(
+                job_scripts=all_bwa_jobs,
+                max_jobs=args.max_jobs,
+                max_retries=args.max_retries,
+                check_interval=args.check_interval,
+                max_wait_time=args.max_wait_time
+            )
             
-            # Wait for all BWA jobs to complete
-            logging.info("Waiting for all BWA jobs to complete...")
-            wait_for_jobs_to_complete(job_ids=bwa_job_ids,
-                                check_interval=args.check_interval,
-                                max_wait_time=args.max_wait_time)
+            if not bwa_result['all_successful']:
+                error_msg = f"BWA step failed: {len(bwa_result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
+                logging.error(error_msg)
+                if args.abort_on_failure:
+                    logging.error("Aborting workflow due to BWA failures")
+                    sys.exit(1)
+                else:
+                    logging.warning("Continuing workflow despite BWA failures - data may be incomplete")
+            else:
+                logging.info("All BWA jobs completed successfully")
         
         # STEP 2: SAM to BAM conversion
         logging.info("\n=== STEP 2: Generating SAM to BAM conversion jobs ===")
@@ -300,7 +338,7 @@ def main():
                                 mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:
-            # Submit all SAM to BAM jobs from all directories and wait for completion
+            # Submit all SAM to BAM jobs from all directories with retry capability
             logging.info("\n=== Submitting SAM to BAM conversion jobs from all directories ===")
             all_bam_jobs = []
             
@@ -311,16 +349,26 @@ def main():
                 all_bam_jobs.extend(bam_jobs)
                 logging.info(f"Found {len(bam_jobs)} SAM to BAM jobs in {job_dir}")
             
-            # Submit all SAM to BAM jobs with limit
-            logging.info(f"Submitting {len(all_bam_jobs)} total SAM to BAM jobs (max concurrent: {args.max_jobs})")
-            bam_job_ids = submit_jobs_with_limit(all_bam_jobs, args.max_jobs)
-            logging.info(f"Submitted {len(bam_job_ids)} SAM to BAM jobs from all directories")
+            # Submit SAM to BAM jobs with retry
+            logging.info(f"Submitting {len(all_bam_jobs)} total SAM to BAM jobs with retry capability")
+            bam_result = submit_jobs_with_retry(
+                job_scripts=all_bam_jobs,
+                max_jobs=args.max_jobs,
+                max_retries=args.max_retries,
+                check_interval=args.check_interval,
+                max_wait_time=args.max_wait_time
+            )
             
-            # Wait for all SAM to BAM jobs to complete
-            logging.info("Waiting for all SAM to BAM jobs to complete...")
-            wait_for_jobs_to_complete(job_ids=bam_job_ids,
-                                check_interval=args.check_interval,
-                                max_wait_time=args.max_wait_time)
+            if not bam_result['all_successful']:
+                error_msg = f"SAM to BAM step failed: {len(bam_result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
+                logging.error(error_msg)
+                if args.abort_on_failure:
+                    logging.error("Aborting workflow due to SAM to BAM failures")
+                    sys.exit(1)
+                else:
+                    logging.warning("Continuing workflow despite SAM to BAM failures - data may be incomplete")
+            else:
+                logging.info("All SAM to BAM jobs completed successfully")
         
         # STEP 3: Stampy processing
         logging.info("\n=== STEP 3: Generating Stampy jobs ===")
@@ -331,7 +379,7 @@ def main():
                         mem_per_cpu=args.mem_per_cpu, cpus=args.stampy_cpus)
         
         if args.submit:
-            # Submit all Stampy jobs from all directories and wait for completion
+            # Submit all Stampy jobs from all directories with retry capability
             logging.info("\n=== Submitting Stampy jobs from all directories ===")
             all_stampy_jobs = []
             
@@ -342,18 +390,28 @@ def main():
                 all_stampy_jobs.extend(stampy_jobs)
                 logging.info(f"Found {len(stampy_jobs)} Stampy jobs in {job_dir}")
             
-            # Submit all Stampy jobs with limit
-            logging.info(f"Submitting {len(all_stampy_jobs)} total Stampy jobs (max concurrent: {args.max_jobs})")
-            stampy_job_ids = submit_jobs_with_limit(all_stampy_jobs, args.max_jobs)
-            logging.info(f"Submitted {len(stampy_job_ids)} Stampy jobs from all directories")
+            # Submit Stampy jobs with retry
+            logging.info(f"Submitting {len(all_stampy_jobs)} total Stampy jobs with retry capability")
+            stampy_result = submit_jobs_with_retry(
+                job_scripts=all_stampy_jobs,
+                max_jobs=args.max_jobs,
+                max_retries=args.max_retries,
+                check_interval=args.check_interval,
+                max_wait_time=args.max_wait_time
+            )
             
-            # Wait for all Stampy jobs to complete
-            logging.info("Waiting for all Stampy jobs to complete...")
-            wait_for_jobs_to_complete(job_ids=stampy_job_ids,
-                                check_interval=args.check_interval,
-                                max_wait_time=args.max_wait_time)
+            if not stampy_result['all_successful']:
+                error_msg = f"Stampy step failed: {len(stampy_result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
+                logging.error(error_msg)
+                if args.abort_on_failure:
+                    logging.error("Aborting workflow due to Stampy failures")
+                    sys.exit(1)
+                else:
+                    logging.warning("Workflow completed despite Stampy failures - data may be incomplete")
+            else:
+                logging.info("All Stampy jobs completed successfully")
             
-            logging.info("\nAll alignment jobs have been submitted and completed!")
+            logging.info("\nAlignment workflow completed successfully!")
         else:
             logging.info("\nWorkflow job generation complete. Submit jobs in order:")
             logging.info("1. Run BWA jobs")

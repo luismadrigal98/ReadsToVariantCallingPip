@@ -54,6 +54,10 @@ def main():
                             help="Seconds between job status checks")
     common_parser.add_argument("--max-wait-time", type=int, default=86400,
                             help="Maximum seconds to wait for jobs")
+    common_parser.add_argument("--max-retries", type=int, default=1,
+                            help="Maximum number of retry attempts for failed jobs")
+    common_parser.add_argument("--abort-on-failure", action="store_true",
+                            help="Abort workflow if jobs fail after retries")
     common_parser.add_argument("--samtools-path", type=str, 
                             default="/kuhpc/sw/conda/latest/envs/bioconda/bin/samtools",
                             help="Path to samtools executable")
@@ -130,7 +134,7 @@ def main():
                             mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:
-            # Find and submit all merge jobs from all directories
+            # Find and submit all merge jobs from all directories with retry capability
             logging.info("=== Submitting merge jobs from all directories ===")
             all_merge_jobs = []
             
@@ -143,16 +147,24 @@ def main():
                 all_merge_jobs.extend(merge_jobs)
                 logging.info(f"Found {len(merge_jobs)} merge jobs in {job_dir}")
             
-            # Submit all merge jobs with limit
-            logging.info(f"Submitting {len(all_merge_jobs)} total merge jobs (max concurrent: {args.max_jobs})")
-            merge_job_ids = submit_jobs_with_limit(all_merge_jobs, args.max_jobs)
-            logging.info(f"Submitted {len(merge_job_ids)} merge jobs from all directories")
+            # Submit merge jobs with retry
+            logging.info(f"Submitting {len(all_merge_jobs)} total merge jobs with retry capability")
+            result = submit_jobs_with_retry(
+                job_scripts=all_merge_jobs,
+                max_jobs=args.max_jobs,
+                max_retries=args.max_retries,
+                check_interval=args.check_interval,
+                max_wait_time=args.max_wait_time
+            )
             
-            if merge_job_ids:
-                logging.info("Waiting for all merge jobs to complete...")
-                wait_for_jobs_to_complete(merge_job_ids, 
-                                        check_interval=args.check_interval,
-                                        max_wait_time=args.max_wait_time)
+            if not result['all_successful']:
+                error_msg = f"Merge jobs failed: {len(result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
+                logging.error(error_msg)
+                if args.abort_on_failure:
+                    logging.error("Aborting due to merge failures")
+                    sys.exit(1)
+            else:
+                logging.info("All merge jobs completed successfully")
     
     elif args.command == "dedup":
         if len(args.input_dirs) != len(args.output_dirs_base) or len(args.input_dirs) != len(args.job_dirs):

@@ -107,6 +107,10 @@ def main():
                             help="Time between job status checks in seconds (default: 300)")
     workflow_parser.add_argument("--max-wait-time", type=int, default=86400,
                             help="Maximum time to wait for jobs in seconds (default: 24 hours)")
+    workflow_parser.add_argument("--max-retries", type=int, default=1,
+                            help="Maximum number of retry attempts for failed jobs")
+    workflow_parser.add_argument("--abort-on-failure", action="store_true",
+                            help="Abort workflow if jobs fail after retries")
 
     # Parse arguments
     args = parser.parse_args()
@@ -173,7 +177,7 @@ def main():
                         mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:
-            # Submit split jobs from all directories and wait for completion
+            # Submit split jobs from all directories with retry capability
             logging.info("\n=== Submitting split jobs from all directories ===")
             all_split_jobs = []
             
@@ -184,18 +188,26 @@ def main():
                 all_split_jobs.extend(split_jobs)
                 logging.info(f"Found {len(split_jobs)} split jobs in {job_dir}")
             
-            # Submit all split jobs with limit
-            logging.info(f"Submitting {len(all_split_jobs)} total split jobs (max concurrent: {args.max_jobs})")
-            all_split_job_ids = submit_jobs_with_limit(all_split_jobs, args.max_jobs)
-            logging.info(f"Submitted {len(all_split_job_ids)} split jobs from all directories")
-            
-            # Wait for all split jobs to complete
-            logging.info(f"Waiting for all split jobs to complete...")
-            wait_for_jobs_to_complete(
-                job_ids=all_split_job_ids,
+            # Submit split jobs with retry
+            logging.info(f"Submitting {len(all_split_jobs)} total split jobs with retry capability")
+            split_result = submit_jobs_with_retry(
+                job_scripts=all_split_jobs,
+                max_jobs=args.max_jobs,
+                max_retries=args.max_retries,
                 check_interval=args.check_interval,
                 max_wait_time=args.max_wait_time
             )
+            
+            if not split_result['all_successful']:
+                error_msg = f"Split step failed: {len(split_result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
+                logging.error(error_msg)
+                if args.abort_on_failure:
+                    logging.error("Aborting workflow due to split failures")
+                    sys.exit(1)
+                else:
+                    logging.warning("Continuing workflow despite split failures - data may be incomplete")
+            else:
+                logging.info("All split jobs completed successfully")
         
         # STEP 2: Generate compression jobs AFTER split is done
         logging.info("\n=== STEP 2: Generating compression jobs ===")
@@ -204,7 +216,7 @@ def main():
                             cpus=args.cpus)
         
         if args.submit:
-            # Submit compression jobs from all directories and wait for completion
+            # Submit compression jobs from all directories with retry capability
             logging.info("\n=== Submitting compression jobs from all directories ===")
             all_compress_jobs = []
             
@@ -215,18 +227,26 @@ def main():
                 all_compress_jobs.extend(compress_jobs)
                 logging.info(f"Found {len(compress_jobs)} compression jobs in {job_dir}")
             
-            # Submit all compression jobs with limit
-            logging.info(f"Submitting {len(all_compress_jobs)} total compression jobs (max concurrent: {args.max_jobs})")
-            all_compress_job_ids = submit_jobs_with_limit(all_compress_jobs, args.max_jobs)
-            logging.info(f"Submitted {len(all_compress_job_ids)} compression jobs from all directories")
-            
-            # Wait for all compression jobs to complete
-            logging.info(f"Waiting for all compression jobs to complete...")
-            wait_for_jobs_to_complete(
-                job_ids=all_compress_job_ids,
+            # Submit compression jobs with retry
+            logging.info(f"Submitting {len(all_compress_jobs)} total compression jobs with retry capability")
+            compress_result = submit_jobs_with_retry(
+                job_scripts=all_compress_jobs,
+                max_jobs=args.max_jobs,
+                max_retries=args.max_retries,
                 check_interval=args.check_interval,
                 max_wait_time=args.max_wait_time
             )
+            
+            if not compress_result['all_successful']:
+                error_msg = f"Compression step failed: {len(compress_result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
+                logging.error(error_msg)
+                if args.abort_on_failure:
+                    logging.error("Aborting workflow due to compression failures")
+                    sys.exit(1)
+                else:
+                    logging.warning("Continuing workflow despite compression failures - data may be incomplete")
+            else:
+                logging.info("All compression jobs completed successfully")
         
         # STEP 3: Generate fastp jobs AFTER compression is done
         logging.info("\n=== STEP 3: Generating fastp jobs ===")
@@ -236,7 +256,7 @@ def main():
                         mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:
-            # Submit fastp jobs from all directories and wait for completion
+            # Submit fastp jobs from all directories with retry capability
             logging.info("\n=== Submitting fastp jobs from all directories ===")
             all_fastp_jobs = []
             
@@ -247,20 +267,28 @@ def main():
                 all_fastp_jobs.extend(fastp_jobs)
                 logging.info(f"Found {len(fastp_jobs)} fastp jobs in {job_dir}")
             
-            # Submit all fastp jobs with limit
-            logging.info(f"Submitting {len(all_fastp_jobs)} total fastp jobs (max concurrent: {args.max_jobs})")
-            all_fastp_job_ids = submit_jobs_with_limit(all_fastp_jobs, args.max_jobs)
-            logging.info(f"Submitted {len(all_fastp_job_ids)} fastp jobs from all directories")
-            
-            # Wait for all fastp jobs to complete
-            logging.info(f"Waiting for all fastp jobs to complete...")
-            wait_for_jobs_to_complete(
-                job_ids=all_fastp_job_ids,
+            # Submit fastp jobs with retry
+            logging.info(f"Submitting {len(all_fastp_jobs)} total fastp jobs with retry capability")
+            fastp_result = submit_jobs_with_retry(
+                job_scripts=all_fastp_jobs,
+                max_jobs=args.max_jobs,
+                max_retries=args.max_retries,
                 check_interval=args.check_interval,
                 max_wait_time=args.max_wait_time
             )
             
-            logging.info("\nAll jobs have been submitted and completed!")
+            if not fastp_result['all_successful']:
+                error_msg = f"Fastp step failed: {len(fastp_result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
+                logging.error(error_msg)
+                if args.abort_on_failure:
+                    logging.error("Aborting workflow due to fastp failures")
+                    sys.exit(1)
+                else:
+                    logging.warning("Workflow completed despite fastp failures - data may be incomplete")
+            else:
+                logging.info("All fastp jobs completed successfully")
+            
+            logging.info("\nQC workflow completed successfully!")
         else:
             logging.info("\nWorkflow job generation complete. Submit jobs in order:")
             logging.info("1. Run split jobs")

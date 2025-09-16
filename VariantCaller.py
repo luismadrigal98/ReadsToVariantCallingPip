@@ -55,6 +55,10 @@ def main():
                             help="Seconds between job status checks")
     common_parser.add_argument("--max-wait-time", type=int, default=86400,
                             help="Maximum seconds to wait for jobs")
+    common_parser.add_argument("--max-retries", type=int, default=1,
+                            help="Maximum number of retry attempts for failed jobs")
+    common_parser.add_argument("--abort-on-failure", action="store_true",
+                            help="Abort workflow if jobs fail after retries")
     common_parser.add_argument("--regions", type=str, nargs="+", default=["all"],
                             help="Genomic regions to process (e.g., Chr_01 Chr_02)")
     common_parser.add_argument("--window-size", type=int, default=1000000,
@@ -180,14 +184,26 @@ def main():
         )
         
         if args.submit and jobs:
-            # Submit jobs
-            job_ids = submit_jobs_with_limit(jobs, args.max_jobs)
-            logging.info(f"Submitted {len(job_ids)} variant calling jobs")
+            # Submit variant calling jobs with retry capability
+            logging.info(f"Submitting {len(jobs)} variant calling jobs with retry capability")
+            result = submit_jobs_with_retry(
+                job_scripts=jobs,
+                max_jobs=args.max_jobs,
+                max_retries=args.max_retries,
+                check_interval=args.check_interval,
+                max_wait_time=args.max_wait_time
+            )
             
-            # Wait for jobs to complete
-            wait_for_jobs_to_complete(job_ids, 
-                                    check_interval=args.check_interval,
-                                    max_wait_time=args.max_wait_time)
+            if not result['all_successful']:
+                error_msg = f"Variant calling failed: {len(result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
+                logging.error(error_msg)
+                if args.abort_on_failure:
+                    logging.error("Aborting due to variant calling failures")
+                    sys.exit(1)
+                else:
+                    logging.warning("Variant calling completed with some failures - data may be incomplete")
+            else:
+                logging.info("All variant calling jobs completed successfully")
     
     elif args.command == "joint-call":
         if (len(args.input_dirs_1) != len(args.input_dirs_2) or 
@@ -227,14 +243,26 @@ def main():
         )
         
         if args.submit and jobs:
-            # Submit jobs
-            job_ids = submit_jobs_with_limit(jobs, args.max_jobs)
-            logging.info(f"Submitted {len(job_ids)} joint variant calling jobs")
+            # Submit joint variant calling jobs with retry capability
+            logging.info(f"Submitting {len(jobs)} joint variant calling jobs with retry capability")
+            result = submit_jobs_with_retry(
+                job_scripts=jobs,
+                max_jobs=args.max_jobs,
+                max_retries=args.max_retries,
+                check_interval=args.check_interval,
+                max_wait_time=args.max_wait_time
+            )
             
-            # Wait for jobs to complete
-            wait_for_jobs_to_complete(job_ids, 
-                                    check_interval=args.check_interval,
-                                    max_wait_time=args.max_wait_time)
+            if not result['all_successful']:
+                error_msg = f"Joint variant calling failed: {len(result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
+                logging.error(error_msg)
+                if args.abort_on_failure:
+                    logging.error("Aborting due to joint variant calling failures")
+                    sys.exit(1)
+                else:
+                    logging.warning("Joint variant calling completed with some failures - data may be incomplete")
+            else:
+                logging.info("All joint variant calling jobs completed successfully")
     
     elif args.command == "merge":
         if len(args.input_dirs) != len(args.output_dirs) or len(args.input_dirs) != len(args.job_dirs):
@@ -258,14 +286,26 @@ def main():
         )
         
         if args.submit and jobs:
-            # Submit jobs
-            job_ids = submit_jobs_with_limit(jobs, args.max_jobs)
-            logging.info(f"Submitted {len(job_ids)} VCF merge jobs")
+            # Submit VCF merge jobs with retry capability
+            logging.info(f"Submitting {len(jobs)} VCF merge jobs with retry capability")
+            result = submit_jobs_with_retry(
+                job_scripts=jobs,
+                max_jobs=args.max_jobs,
+                max_retries=args.max_retries,
+                check_interval=args.check_interval,
+                max_wait_time=args.max_wait_time
+            )
             
-            # Wait for jobs to complete
-            wait_for_jobs_to_complete(job_ids, 
-                                    check_interval=args.check_interval,
-                                    max_wait_time=args.max_wait_time)
+            if not result['all_successful']:
+                error_msg = f"VCF merge failed: {len(result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
+                logging.error(error_msg)
+                if args.abort_on_failure:
+                    logging.error("Aborting due to VCF merge failures")
+                    sys.exit(1)
+                else:
+                    logging.warning("VCF merge completed with some failures - data may be incomplete")
+            else:
+                logging.info("All VCF merge jobs completed successfully")
 
     elif args.command == "atomize":
         # Run atomization

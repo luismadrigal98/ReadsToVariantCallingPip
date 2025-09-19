@@ -9,17 +9,59 @@ import os
 import re
 import logging
 
+def extract_sample_id(filename, method="auto"):
+    """
+    Exdef generate_compress_jobs(batch_dirs, job_dirs, partition="sixhour", 
+                           time="6:00:00", email=None, 
+                           mem_per_cpu="5g", cpus=10):ct a meaningful sample ID from a filename for job naming.
+    
+    Parameters:
+    filename (str): The input filename
+    method (str): Method for extraction - "auto", "prefix", "remove_extensions", or "full"
+    
+    Returns:
+    str: A clean sample ID suitable for job naming
+    """
+    # Remove file extensions
+    base_name = filename
+    for ext in ['.fastq.gz', '.fq.gz', '.fastq', '.fq', '.gz']:
+        if base_name.endswith(ext):
+            base_name = base_name[:-len(ext)]
+            break
+    
+    if method == "auto":
+        # Try to detect if this looks like split files and use appropriate method
+        if re.search(r'_[a-z]{2}$', base_name):  # Ends with _XX (like _gb, _fu, etc.)
+            return base_name  # Use full name for split files
+        else:
+            # For non-split files, use prefix method
+            return base_name.split('_')[0]
+    elif method == "prefix":
+        # Use only the first part before underscore
+        return base_name.split('_')[0]
+    elif method == "remove_extensions":
+        # Use the full name minus extensions
+        return base_name
+    elif method == "full":
+        # Use the original filename
+        return filename
+    else:
+        # Default fallback
+        return base_name
+
 def create_directory(directory):
     """Create directory if it doesn't exist."""
     if not os.path.exists(directory):
         os.makedirs(directory)
 
-def detect_file_type(input_dir):
+def detect_file_type(input_dir, r1_pattern="_R1_", r2_pattern="_R2_"):
     """
     Analyze FASTQ files in a directory to determine if they are paired-end or single-end.
     
     Parameters:
     input_dir (str): Directory containing FASTQ files
+    r1_pattern (str): Pattern to identify R1 files (default: "_R1_")
+    r2_pattern (str): Pattern to identify R2 files (default: "_R2_")
     
     Returns:
     dict: Dictionary with lists of paired and single files
@@ -38,9 +80,9 @@ def detect_file_type(input_dir):
         'single_files': [],  # Will hold single-end files
     }
     
-    # First identify potential pairs (Illumina naming convention)
-    r1_files = [f for f in fastq_files if '_R1_' in f]
-    r2_files = [f for f in fastq_files if '_R2_' in f]
+    # First identify potential pairs using configurable patterns
+    r1_files = [f for f in fastq_files if r1_pattern in f]
+    r2_files = [f for f in fastq_files if r2_pattern in f]
     
     logging.info(f"Found {len(r1_files)} R1 files and {len(r2_files)} R2 files")
     logging.debug(f"R1 files: {r1_files[:5]}...")  # Show first 5 R1 files
@@ -49,7 +91,7 @@ def detect_file_type(input_dir):
     # Match pairs - now handles both original and split files
     paired = set()
     for r1 in r1_files:
-        r2_candidate = r1.replace('_R1_', '_R2_')
+        r2_candidate = r1.replace(r1_pattern, r2_pattern)
         if r2_candidate in r2_files:
             result['paired_files'].append((r1, r2_candidate))
             paired.add(r1)
@@ -83,7 +125,7 @@ def get_sample_structure(input_directories):
     return samples
 
 def generate_split_jobs(input_dirs, output_dirs, job_dirs, lines=4000000, partition="sixhour", 
-                        time="6:00:00", email="l338m483@ku.edu", mem_per_cpu="5g", cpus=10):
+                        time="6:00:00", email=None, mem_per_cpu="5g", cpus=10):
     """
     Generate SLURM job scripts to decompress and split FASTQ files.
     Handles both single-end and paired-end files.
@@ -127,8 +169,9 @@ def generate_split_jobs(input_dirs, output_dirs, job_dirs, lines=4000000, partit
                     script.write("#SBATCH --ntasks=1\n")
                     script.write(f"#SBATCH --cpus-per-task={cpus}\n")
                     script.write(f"#SBATCH --time={time}\n")
-                    script.write(f"#SBATCH --mail-user={email}\n")
-                    script.write("#SBATCH --mail-type=FAIL\n")
+                    if email:  # Only add email notifications if email is provided
+                        script.write(f"#SBATCH --mail-user={email}\n")
+                        script.write("#SBATCH --mail-type=FAIL\n")
                     script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
                     script.write("\n")
                     script.write(f"cd {input_dir}\n")
@@ -184,8 +227,9 @@ def generate_compress_jobs(batch_dirs, job_dirs, partition="sixhour",
                     script.write("#SBATCH --ntasks=1\n")
                     script.write(f"#SBATCH --cpus-per-task={cpus}\n")
                     script.write(f"#SBATCH --time={time}\n")
-                    script.write(f"#SBATCH --mail-user={email}\n")
-                    script.write("#SBATCH --mail-type=FAIL\n")
+                    if email:  # Only add email notifications if email is provided
+                        script.write(f"#SBATCH --mail-user={email}\n")
+                        script.write("#SBATCH --mail-type=FAIL\n")
                     script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
                     script.write("\n")
                     script.write(f"cd {batch_dir}\n")
@@ -200,10 +244,11 @@ def generate_compress_jobs(batch_dirs, job_dirs, partition="sixhour",
         except Exception as e:
             logging.error(f"An error occurred: {e}")
 
-def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l338m483/fastp",
+def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="fastp",
                         fastp_control_param="",
-                        partition="sixhour", time="6:00:00", email="l338m483@ku.edu", 
-                        mem_per_cpu="5g", cpus=10):
+                        partition="sixhour", time="6:00:00", email=None, 
+                        mem_per_cpu="5g", cpus=10, r1_pattern="_R1_", r2_pattern="_R2_",
+                        sample_id_method="auto"):
     """
     Generate SLURM job scripts to run fastp on FASTQ files, handling both paired and single-end reads.
     
@@ -211,13 +256,16 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l33
     batch_dirs (list): List of directories containing FASTQ files
     output_dirs (list): List of directories for fastp output
     job_dirs (list): List of directories for job scripts
-    fastp_path (str): Path to fastp executable
-    fastp_options (str): Additional options to pass to fastp
+    fastp_path (str): Path to fastp executable (default: "fastp" - assumes it's in PATH)
+    fastp_control_param (str): Additional options to pass to fastp
     partition (str): SLURM partition to use
     time (str): Time limit for jobs
-    email (str): Email for notifications
+    email (str): Email for notifications (if None, no email notifications)
     mem_per_cpu (str): Memory per CPU
     cpus (int): Number of CPUs per task
+    r1_pattern (str): Pattern to identify R1 files (default: "_R1_")
+    r2_pattern (str): Pattern to identify R2 files (default: "_R2_")
+    sample_id_method (str): Method for sample ID extraction ("auto", "prefix", "remove_extensions", "full")
     """
     
     for batch_dir, output_dir, job_dir in zip(batch_dirs, output_dirs, job_dirs):
@@ -228,17 +276,14 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l33
         try:
             # Detect file types in the directory
             logging.info(f"Processing directory: {batch_dir}")
-            file_types = detect_file_type(batch_dir)
+            file_types = detect_file_type(batch_dir, r1_pattern, r2_pattern)
             
             logging.info(f"Detected {len(file_types['paired_files'])} paired file sets and {len(file_types['single_files'])} single files")
             
             # Process paired-end files
             for r1_file, r2_file in file_types['paired_files']:
-                # Extract a meaningful name for the job - include the full filename parts to make it unique
-                # For files like JKK-16A_S3_L004_SET3_R1_001_fu.gz, use the full identifier
-                # Remove the _R1_ part and extension to get a unique base name
-                base_name = r1_file.replace('_R1_', '_').replace('.gz', '').replace('.fastq', '').replace('.fq', '')
-                sample_id = base_name  # Use the full base name as sample_id to ensure uniqueness
+                # Extract a meaningful name for the job using flexible method
+                sample_id = extract_sample_id(r1_file, sample_id_method)
                 
                 out1 = r1_file.replace(".gz", "_preprocessed.fastq.gz")
                 out2 = r2_file.replace(".gz", "_preprocessed.fastq.gz")
@@ -262,8 +307,9 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l33
                     script.write("#SBATCH --ntasks=1\n")
                     script.write(f"#SBATCH --cpus-per-task={cpus}\n")
                     script.write(f"#SBATCH --time={time}\n")
-                    script.write(f"#SBATCH --mail-user={email}\n")
-                    script.write("#SBATCH --mail-type=FAIL\n")
+                    if email:  # Only add email notifications if email is provided
+                        script.write(f"#SBATCH --mail-user={email}\n")
+                        script.write("#SBATCH --mail-type=FAIL\n")
                     script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
                     script.write("\n")
                     script.write(f"cd {batch_dir}\n")
@@ -275,8 +321,8 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l33
             
             # Process single-end files
             for single_file in file_types['single_files']:
-                # Extract a meaningful name for the job - use full filename without extension
-                sample_id = single_file.replace('.gz', '').replace('.fastq', '').replace('.fq', '')
+                # Extract a meaningful name for the job using flexible method
+                sample_id = extract_sample_id(single_file, sample_id_method)
                 
                 out_file = single_file.replace(".gz", "_preprocessed.fastq.gz")
                 
@@ -297,8 +343,9 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l33
                     script.write("#SBATCH --ntasks=1\n")
                     script.write(f"#SBATCH --cpus-per-task={cpus}\n")
                     script.write(f"#SBATCH --time={time}\n")
-                    script.write(f"#SBATCH --mail-user={email}\n")
-                    script.write("#SBATCH --mail-type=FAIL\n")
+                    if email:  # Only add email notifications if email is provided
+                        script.write(f"#SBATCH --mail-user={email}\n")
+                        script.write("#SBATCH --mail-type=FAIL\n")
                     script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
                     script.write("\n")
                     script.write(f"cd {batch_dir}\n")

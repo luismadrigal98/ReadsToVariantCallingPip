@@ -35,7 +35,7 @@ def main():
     
     # Common arguments for all commands
     common_parser = argparse.ArgumentParser(add_help=False)
-    common_parser.add_argument("--email", type=str, default="l338m483@ku.edu", help="Email for job notifications")
+    common_parser.add_argument("--email", type=str, default=None, help="Email for job notifications (optional)")
     common_parser.add_argument("--partition", type=str, default="sixhour", help="SLURM partition to use")
     common_parser.add_argument("--time", type=str, default="6:00:00", help="Time limit for jobs")
     common_parser.add_argument("--mem-per-cpu", type=str, default="5g", help="Memory per CPU")
@@ -91,11 +91,18 @@ def main():
                             help="Directories for fastp output")
     fastp_parser.add_argument("--job-dirs", type=str, nargs="+", required=True,
                             help="Directories for job scripts")
-    fastp_parser.add_argument("--fastp-path", type=str, default="/home/l338m483/fastp",
-                            help="Path to fastp executable")
+    fastp_parser.add_argument("--fastp-path", type=str, default="fastp",
+                            help="Path to fastp executable (default: 'fastp' - assumes it's in PATH)")
     fastp_parser.add_argument("--fastp-control-param", type=str,  # Change underscore to hyphen
                         default="-3 --complexity_threshold=20 --length_required=50 --cut_window_size=3 --cut_mean_quality=30",
                         help="Control parameters common to single and double end reads. Notice that you must provide an unique string separated by spaces.")
+    fastp_parser.add_argument("--r1-pattern", type=str, default="_R1_",
+                            help="Pattern to identify R1 files (default: '_R1_')")
+    fastp_parser.add_argument("--r2-pattern", type=str, default="_R2_",
+                            help="Pattern to identify R2 files (default: '_R2_')")
+    fastp_parser.add_argument("--sample-id-method", type=str, default="auto",
+                            choices=["auto", "prefix", "remove_extensions", "full"],
+                            help="Method for sample ID extraction (default: 'auto')")
     fastp_parser.add_argument("--submit", action="store_true",
                             help="Submit jobs to SLURM")
     fastp_parser.add_argument("--max-jobs", type=int, default=5000,
@@ -122,11 +129,18 @@ def main():
                             help="Directories for job scripts")
     workflow_parser.add_argument("--lines", type=int, default=4000000,
                             help="Number of lines per split file (default: 4000000)")
-    workflow_parser.add_argument("--fastp-path", type=str, default="/home/l338m483/fastp",
-                            help="Path to fastp executable")
+    workflow_parser.add_argument("--fastp-path", type=str, default="fastp",
+                            help="Path to fastp executable (default: 'fastp' - assumes it's in PATH)")
     workflow_parser.add_argument("--fastp-control-param", type=str, 
                             default="-3 --complexity_threshold=20 --length_required=50 --cut_window_size=3 --cut_mean_quality=30",
                             help="Control parameters common to single and double end reads")
+    workflow_parser.add_argument("--r1-pattern", type=str, default="_R1_",
+                            help="Pattern to identify R1 files (default: '_R1_')")
+    workflow_parser.add_argument("--r2-pattern", type=str, default="_R2_",
+                            help="Pattern to identify R2 files (default: '_R2_')")
+    workflow_parser.add_argument("--sample-id-method", type=str, default="auto",
+                            choices=["auto", "prefix", "remove_extensions", "full"],
+                            help="Method for sample ID extraction (default: 'auto')")
     workflow_parser.add_argument("--submit", action="store_true",
                             help="Automatically submit jobs after generation")
     workflow_parser.add_argument("--max-jobs", type=int, default=5000,
@@ -229,7 +243,9 @@ def main():
         generate_fastp_jobs(args.batch_dirs, args.output_dirs, args.job_dirs, fastp_path=args.fastp_path,
                         fastp_control_param=args.fastp_control_param,
                         partition=args.partition, time=args.time, email=args.email,
-                        mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
+                        mem_per_cpu=args.mem_per_cpu, cpus=args.cpus,
+                        r1_pattern=args.r1_pattern, r2_pattern=args.r2_pattern,
+                        sample_id_method=args.sample_id_method)
         
         if args.submit:
             # Submit fastp jobs with retry capability
@@ -353,7 +369,9 @@ def main():
         generate_fastp_jobs(args.split_dirs, args.fastp_dirs, args.job_dirs, fastp_path=args.fastp_path,
                         fastp_control_param=args.fastp_control_param,
                         partition=args.partition, time=args.time, email=args.email,
-                        mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
+                        mem_per_cpu=args.mem_per_cpu, cpus=args.cpus,
+                        r1_pattern=args.r1_pattern, r2_pattern=args.r2_pattern,
+                        sample_id_method=args.sample_id_method)
         
         if args.submit:
             # Submit fastp jobs from all directories with retry capability

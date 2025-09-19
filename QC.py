@@ -104,6 +104,10 @@ def main():
                             help="Time between job status checks in seconds (default: 300)")
     fastp_parser.add_argument("--max-wait-time", type=int, default=86400,
                             help="Maximum time to wait for jobs in seconds (default: 24 hours)")
+    fastp_parser.add_argument("--max-retries", type=int, default=1,
+                            help="Maximum number of retry attempts for failed jobs")
+    fastp_parser.add_argument("--abort-on-failure", action="store_true",
+                            help="Abort if jobs fail after retries")
 
     # Workflow command (runs all steps)
     workflow_parser = subparsers.add_parser("workflow", parents=[common_parser], 

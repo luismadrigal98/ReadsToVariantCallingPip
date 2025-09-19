@@ -234,9 +234,11 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l33
             
             # Process paired-end files
             for r1_file, r2_file in file_types['paired_files']:
-                # Extract a meaningful name for the job
-                # Try to get the sample ID from the filename (assumes format like SAMPLE_S1_L001_R1_001.fastq.gz)
-                sample_id = r1_file.split('_')[0]
+                # Extract a meaningful name for the job - include the full filename parts to make it unique
+                # For files like JKK-16A_S3_L004_SET3_R1_001_fu.gz, use the full identifier
+                # Remove the _R1_ part and extension to get a unique base name
+                base_name = r1_file.replace('_R1_', '_').replace('.gz', '').replace('.fastq', '').replace('.fq', '')
+                sample_id = base_name  # Use the full base name as sample_id to ensure uniqueness
                 
                 out1 = r1_file.replace(".gz", "_preprocessed.fastq.gz")
                 out2 = r2_file.replace(".gz", "_preprocessed.fastq.gz")
@@ -273,8 +275,8 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l33
             
             # Process single-end files
             for single_file in file_types['single_files']:
-                # Extract a meaningful name for the job
-                sample_id = single_file.split('.')[0]  # Assumes format like 1192c.fq.gz
+                # Extract a meaningful name for the job - use full filename without extension
+                sample_id = single_file.replace('.gz', '').replace('.fastq', '').replace('.fq', '')
                 
                 out_file = single_file.replace(".gz", "_preprocessed.fastq.gz")
                 

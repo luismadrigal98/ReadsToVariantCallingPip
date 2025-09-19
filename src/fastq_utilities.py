@@ -29,6 +29,9 @@ def detect_file_type(input_dir):
                         (f.endswith('.gz'))
                         )]
     
+    logging.info(f"Found {len(fastq_files)} total files in {input_dir}")
+    logging.debug(f"Files found: {fastq_files[:10]}...")  # Show first 10 files for debugging
+    
     # Initialize result structure
     result = {
         'paired_files': [],  # Will hold tuples of (R1, R2)
@@ -39,7 +42,11 @@ def detect_file_type(input_dir):
     r1_files = [f for f in fastq_files if '_R1_' in f]
     r2_files = [f for f in fastq_files if '_R2_' in f]
     
-    # Match pairs
+    logging.info(f"Found {len(r1_files)} R1 files and {len(r2_files)} R2 files")
+    logging.debug(f"R1 files: {r1_files[:5]}...")  # Show first 5 R1 files
+    logging.debug(f"R2 files: {r2_files[:5]}...")  # Show first 5 R2 files
+    
+    # Match pairs - now handles both original and split files
     paired = set()
     for r1 in r1_files:
         r2_candidate = r1.replace('_R1_', '_R2_')
@@ -47,6 +54,7 @@ def detect_file_type(input_dir):
             result['paired_files'].append((r1, r2_candidate))
             paired.add(r1)
             paired.add(r2_candidate)
+            logging.debug(f"Paired: {r1} <-> {r2_candidate}")
     
     # All other files are considered single-end
     for f in fastq_files:
@@ -219,7 +227,10 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="/home/l33
         
         try:
             # Detect file types in the directory
+            logging.info(f"Processing directory: {batch_dir}")
             file_types = detect_file_type(batch_dir)
+            
+            logging.info(f"Detected {len(file_types['paired_files'])} paired file sets and {len(file_types['single_files'])} single files")
             
             # Process paired-end files
             for r1_file, r2_file in file_types['paired_files']:

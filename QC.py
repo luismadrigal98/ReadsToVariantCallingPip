@@ -128,14 +128,14 @@ def main():
                             help="Directories for job scripts")
     compress_parser.add_argument("--submit", action="store_true",
                             help="Submit jobs to SLURM")
-    compress_parser.add_argument("--max-jobs", type=int, default=5000,
-                            help="Maximum number of jobs to submit at once")
-    compress_parser.add_argument("--check-interval", type=int, default=300,
-                            help="Time between job status checks in seconds")
+    compress_parser.add_argument("--max-jobs", type=int, default=500,
+                               help="Maximum number of jobs to submit at once (reduced for stability)")
+    compress_parser.add_argument("--check-interval", type=int, default=120,
+                               help="Time between job status checks in seconds (reduced for faster detection)")
     compress_parser.add_argument("--max-wait-time", type=int, default=86400,
-                            help="Maximum time to wait for jobs in seconds")
-    compress_parser.add_argument("--max-retries", type=int, default=1,
-                            help="Maximum number of retry attempts for failed jobs")
+                               help="Maximum time to wait for jobs in seconds")
+    compress_parser.add_argument("--max-retries", type=int, default=2,
+                               help="Maximum number of retry attempts for failed jobs")
     compress_parser.add_argument("--abort-on-failure", action="store_true",
                             help="Abort if jobs fail after retries")
     
@@ -161,14 +161,14 @@ def main():
                             help="Method for sample ID extraction (default: 'auto')")
     fastp_parser.add_argument("--submit", action="store_true",
                             help="Submit jobs to SLURM")
-    fastp_parser.add_argument("--max-jobs", type=int, default=5000,
-                            help="Maximum number of jobs to submit at once")
-    fastp_parser.add_argument("--check-interval", type=int, default=300,
-                            help="Time between job status checks in seconds (default: 300)")
+    fastp_parser.add_argument("--max-jobs", type=int, default=500,
+                            help="Maximum number of jobs to submit at once (reduced for stability)")
+    fastp_parser.add_argument("--check-interval", type=int, default=120,
+                            help="Time between job status checks in seconds (reduced for faster detection)")
     fastp_parser.add_argument("--max-wait-time", type=int, default=86400,
-                            help="Maximum time to wait for jobs in seconds (default: 24 hours)")
+                            help="Maximum time to wait for jobs in seconds")
     fastp_parser.add_argument("--max-retries", type=int, default=2,
-                            help="Maximum number of retry attempts for failed jobs (default: 2)")
+                            help="Maximum number of retry attempts for failed jobs")
     fastp_parser.add_argument("--abort-on-failure", action="store_true",
                             help="Abort if jobs fail after retries")
     fastp_parser.add_argument("--retry-delay", type=int, default=60,
@@ -201,13 +201,13 @@ def main():
                             help="Method for sample ID extraction (default: 'auto')")
     workflow_parser.add_argument("--submit", action="store_true",
                             help="Automatically submit jobs after generation")
-    workflow_parser.add_argument("--max-jobs", type=int, default=5000,
-                            help="Maximum number of jobs to have in queue at once (default: 5000)")
-    workflow_parser.add_argument("--check-interval", type=int, default=300,
-                            help="Time between job status checks in seconds (default: 300)")
+    workflow_parser.add_argument("--max-jobs", type=int, default=500,
+                            help="Maximum number of jobs to have in queue at once (reduced for stability)")
+    workflow_parser.add_argument("--check-interval", type=int, default=120,
+                            help="Time between job status checks in seconds (reduced for faster detection)")
     workflow_parser.add_argument("--max-wait-time", type=int, default=86400,
-                            help="Maximum time to wait for jobs in seconds (default: 24 hours)")
-    workflow_parser.add_argument("--max-retries", type=int, default=1,
+                            help="Maximum time to wait for jobs in seconds")
+    workflow_parser.add_argument("--max-retries", type=int, default=2,
                             help="Maximum number of retry attempts for failed jobs")
     workflow_parser.add_argument("--abort-on-failure", action="store_true",
                             help="Abort workflow if jobs fail after retries")

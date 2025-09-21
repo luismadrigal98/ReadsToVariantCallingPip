@@ -23,6 +23,48 @@ import subprocess
 import time
 import logging
 
+def analyze_failed_job(job_id):
+    """
+    Analyze a failed job to understand why it failed
+    
+    Parameters:
+    job_id (str): SLURM job ID to analyze
+    
+    Returns:
+    dict: Analysis results with failure reason
+    """
+    try:
+        # Get job info using sacct
+        cmd = f"sacct -j {job_id} -o JobID,JobName,State,ExitCode,Reason,DerivedExitCode --parsable2 --noheader"
+        output = subprocess.check_output(cmd, shell=True).decode().strip()
+        
+        if not output:
+            return {"error": "No job information found"}
+        
+        lines = output.split('\n')
+        job_info = lines[0].split('|')
+        
+        if len(job_info) >= 6:
+            job_name = job_info[1]
+            state = job_info[2]
+            exit_code = job_info[3]
+            reason = job_info[4]
+            derived_exit_code = job_info[5]
+            
+            return {
+                "job_id": job_id,
+                "job_name": job_name,
+                "state": state,
+                "exit_code": exit_code,
+                "reason": reason,
+                "derived_exit_code": derived_exit_code
+            }
+        else:
+            return {"error": "Could not parse job information"}
+            
+    except subprocess.CalledProcessError as e:
+        return {"error": f"Failed to get job info: {e}"}
+
 def get_job_count(user=None):
     """Get the number of jobs in the SLURM queue for a specific user."""
     if user is None:
@@ -37,7 +79,7 @@ def get_job_count(user=None):
         logging.error(f"Error checking job count for user {user}")
         return 0
 
-def submit_jobs_with_limit(job_files, max_jobs=4900, sleep_time=60):
+def submit_jobs_with_limit(job_files, max_jobs=4900, sleep_time=60, submission_delay=2.0):
     """
     Submit jobs while respecting a maximum job limit.
     
@@ -45,6 +87,7 @@ def submit_jobs_with_limit(job_files, max_jobs=4900, sleep_time=60):
     job_files (list): List of job script paths to submit
     max_jobs (int): Maximum number of jobs allowed in queue
     sleep_time (int): Time to wait between submission batches in seconds
+    submission_delay (float): Delay between individual job submissions in seconds
     
     Returns:
     list: List of job IDs that were submitted
@@ -72,8 +115,8 @@ def submit_jobs_with_limit(job_files, max_jobs=4900, sleep_time=60):
             else:
                 logging.warning(f"Unexpected sbatch output: {output}")
             
-            # Small delay to avoid overwhelming the scheduler
-            time.sleep(0.5)
+            # Increased delay to avoid overwhelming the scheduler
+            time.sleep(submission_delay)
             
         except subprocess.CalledProcessError as e:
             logging.error(f"Error submitting job {job_file}: {e}")
@@ -151,6 +194,12 @@ def wait_for_jobs_to_complete(job_ids=None, job_name_pattern=None, check_interva
                             if job_failed:
                                 failed_jobs.append(job_id)
                                 logging.warning(f"Job {job_id} failed with state: {state}, exit code: {exit_code}")
+                                
+                                # Get detailed failure analysis
+                                failure_analysis = analyze_failed_job(job_id)
+                                if 'error' not in failure_analysis:
+                                    logging.warning(f"Job {job_id} failure details: {failure_analysis['reason']}")
+                                
                             else:
                                 completed_jobs.append(job_id)
                                 logging.info(f"Job {job_id} completed successfully")
@@ -255,8 +304,8 @@ def retry_failed_jobs(failed_job_scripts, max_jobs, max_retries=1):
         retry_count += 1
         logging.info(f"=== RETRY ATTEMPT {retry_count}/{max_retries} for {len(jobs_to_retry)} failed jobs ===")
         
-        # Submit the failed jobs again
-        retry_job_ids = submit_jobs_with_limit(jobs_to_retry, max_jobs)
+        # Submit the failed jobs again with increased delay for stability
+        retry_job_ids = submit_jobs_with_limit(jobs_to_retry, max_jobs, submission_delay=3.0)
         logging.info(f"Resubmitted {len(retry_job_ids)} jobs for retry attempt {retry_count}")
         
         if not retry_job_ids:
@@ -324,8 +373,8 @@ def submit_jobs_with_retry(job_scripts, max_jobs, max_retries=1, check_interval=
     
     logging.info(f"Submitting {len(job_scripts)} jobs with retry capability (max retries: {max_retries})")
     
-    # Initial submission
-    job_ids = submit_jobs_with_limit(job_scripts, max_jobs)
+    # Initial submission with increased delay for stability
+    job_ids = submit_jobs_with_limit(job_scripts, max_jobs, submission_delay=2.0)
     if not job_ids:
         logging.error("Failed to submit any jobs")
         return {'all_successful': False, 'completed': [], 'final_failures': job_scripts}

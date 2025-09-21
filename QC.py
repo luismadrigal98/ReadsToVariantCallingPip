@@ -1,7 +1,21 @@
 #!/usr/bin/env python3
 
 """
-This program will be used to run fastp over a set of fastq files on a high performance cluster.
+This program will be used to run fastp over a set of fastq files on a high perform    compress_parser.add_argument("--max-    fastp_parser.add_argument("--max-jobs", type=int, default=500,
+                            help="Maximum number of jobs to submit at once (reduced for stability)")
+    fastp_parser.add_argument("--check-interval", type=int, default=120,
+                            help="Time between job status checks in seconds (reduced for faster detection)")
+    fastp_parser.add_argument("--max-wait-time", type=int, default=86400,
+                            help="Maximum time to wait for jobs in seconds")
+    fastp_parser.add_argument("--max-retries", type=int, default=2,
+                            help="Maximum number of retry attempts for failed jobs")ype=int, default=500,
+                               help="Maximum number of jobs to submit at once (reduced for stability)")
+    compress_parser.add_argument("--check-interval", type=int, default=120,
+                               help="Time between job status checks in seconds (reduced for faster detection)")
+    compress_parser.add_argument("--max-wait-time", type=int, default=86400,
+                               help="Maximum time to wait for jobs in seconds")
+    compress_parser.add_argument("--max-retries", type=int, default=2,
+                               help="Maximum number of retry attempts for failed jobs")ster.
 
 This essentially will be a wrapper script that will integrate all required steps for the preprocessing of fastq files prior to
 the mapping step using fastp.
@@ -89,13 +103,13 @@ def main():
                             help="Number of lines per split file (default: 4000000)")
     split_parser.add_argument("--submit", action="store_true",
                             help="Submit jobs to SLURM")
-    split_parser.add_argument("--max-jobs", type=int, default=5000,
-                            help="Maximum number of jobs to submit at once")
-    split_parser.add_argument("--check-interval", type=int, default=300,
-                            help="Time between job status checks in seconds")
+    split_parser.add_argument("--max-jobs", type=int, default=500,
+                            help="Maximum number of jobs to submit at once (reduced for stability)")
+    split_parser.add_argument("--check-interval", type=int, default=120,
+                            help="Time between job status checks in seconds (reduced for faster detection)")
     split_parser.add_argument("--max-wait-time", type=int, default=86400,
                             help="Maximum time to wait for jobs in seconds")
-    split_parser.add_argument("--max-retries", type=int, default=1,
+    split_parser.add_argument("--max-retries", type=int, default=2,
                             help="Maximum number of retry attempts for failed jobs")
     split_parser.add_argument("--abort-on-failure", action="store_true",
                             help="Abort if jobs fail after retries")

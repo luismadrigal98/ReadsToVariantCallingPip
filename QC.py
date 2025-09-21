@@ -27,6 +27,42 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 from fastq_utilities import *
 from slurm_utilities import *
 
+def print_job_summary(step_name, result, total_jobs):
+    """
+    Print a comprehensive summary of job execution results.
+    
+    Parameters:
+    step_name (str): Name of the pipeline step (e.g., "Split", "Compression", "FastP")
+    result (dict): Result dictionary from submit_jobs_with_retry
+    total_jobs (int): Total number of jobs submitted
+    """
+    logging.info(f"\n{'='*60}")
+    logging.info(f"{step_name.upper()} JOBS SUMMARY")
+    logging.info(f"{'='*60}")
+    
+    completed = len(result['completed'])
+    failed = len(result['final_failures'])
+    success_rate = (completed / total_jobs * 100) if total_jobs > 0 else 0
+    
+    logging.info(f"Total jobs submitted:    {total_jobs}")
+    logging.info(f"Successfully completed:  {completed}")
+    logging.info(f"Final failures:          {failed}")
+    logging.info(f"Success rate:            {success_rate:.1f}%")
+    
+    if result['all_successful']:
+        logging.info(f"✅ ALL {step_name.upper()} JOBS COMPLETED SUCCESSFULLY!")
+    else:
+        logging.warning(f"⚠️  {failed} {step_name.upper()} JOBS FAILED AFTER RETRIES")
+        if result['final_failures']:
+            logging.warning("Failed job scripts:")
+            for job in result['final_failures'][:5]:  # Show first 5 failures
+                logging.warning(f"  - {job}")
+            if len(result['final_failures']) > 5:
+                logging.warning(f"  ... and {len(result['final_failures']) - 5} more")
+    
+    logging.info(f"{'='*60}\n")
+    return result['all_successful']
+
 def main():
     parser = argparse.ArgumentParser(description="FASTQ preprocessing for variant calling pipeline")
     
@@ -169,7 +205,7 @@ def main():
                         mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:
-            # Submit split jobs with retry capability
+            # Submit split jobs with retry
             logging.info("=== Submitting split jobs from all directories ===")
             all_split_jobs = []
             
@@ -190,14 +226,12 @@ def main():
                 max_wait_time=args.max_wait_time
             )
             
-            if not result['all_successful']:
-                error_msg = f"Split jobs failed: {len(result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
-                logging.error(error_msg)
-                if args.abort_on_failure:
-                    logging.error("Aborting due to split failures")
-                    sys.exit(1)
-            else:
-                logging.info("All split jobs completed successfully")
+            # Print comprehensive summary
+            success = print_job_summary("Split", result, len(all_split_jobs))
+            
+            if not success and args.abort_on_failure:
+                logging.error("Aborting due to split failures")
+                sys.exit(1)
     
     elif args.command == "compress":
         if len(args.batch_dirs) != len(args.job_dirs):
@@ -229,14 +263,12 @@ def main():
                 max_wait_time=args.max_wait_time
             )
             
-            if not result['all_successful']:
-                error_msg = f"Compression jobs failed: {len(result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
-                logging.error(error_msg)
-                if args.abort_on_failure:
-                    logging.error("Aborting due to compression failures")
-                    sys.exit(1)
-            else:
-                logging.info("All compression jobs completed successfully")
+            # Print comprehensive summary
+            success = print_job_summary("Compression", result, len(all_compress_jobs))
+            
+            if not success and args.abort_on_failure:
+                logging.error("Aborting due to compression failures")
+                sys.exit(1)
     
     elif args.command == "fastp":
         if len(args.batch_dirs) != len(args.output_dirs) or len(args.batch_dirs) != len(args.job_dirs):
@@ -271,16 +303,14 @@ def main():
                 max_wait_time=args.max_wait_time
             )
             
-            if not result['all_successful']:
-                error_msg = f"Fastp jobs failed: {len(result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
-                logging.error(error_msg)
-                if args.abort_on_failure:
-                    logging.error("Aborting due to fastp failures")
-                    sys.exit(1)
-            else:
-                logging.info("All fastp jobs completed successfully")
+            # Print comprehensive summary
+            success = print_job_summary("FastP", result, len(all_fastp_jobs))
             
-            logging.info("All fastp jobs completed!")
+            if not success and args.abort_on_failure:
+                logging.error("Aborting due to fastp failures")
+                sys.exit(1)
+            
+            logging.info("FastP processing completed!")
     
     elif args.command == "workflow":
     # Verify directory counts match
@@ -316,16 +346,15 @@ def main():
                 max_wait_time=args.max_wait_time
             )
             
-            if not split_result['all_successful']:
-                error_msg = f"Split step failed: {len(split_result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
-                logging.error(error_msg)
+            # Print comprehensive summary
+            split_success = print_job_summary("Split", split_result, len(all_split_jobs))
+            
+            if not split_success:
                 if args.abort_on_failure:
                     logging.error("Aborting workflow due to split failures")
                     sys.exit(1)
                 else:
                     logging.warning("Continuing workflow despite split failures - data may be incomplete")
-            else:
-                logging.info("All split jobs completed successfully")
         
         # STEP 2: Generate compression jobs AFTER split is done
         logging.info("\n=== STEP 2: Generating compression jobs ===")
@@ -355,16 +384,15 @@ def main():
                 max_wait_time=args.max_wait_time
             )
             
-            if not compress_result['all_successful']:
-                error_msg = f"Compression step failed: {len(compress_result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
-                logging.error(error_msg)
+            # Print comprehensive summary
+            compress_success = print_job_summary("Compression", compress_result, len(all_compress_jobs))
+            
+            if not compress_success:
                 if args.abort_on_failure:
                     logging.error("Aborting workflow due to compression failures")
                     sys.exit(1)
                 else:
                     logging.warning("Continuing workflow despite compression failures - data may be incomplete")
-            else:
-                logging.info("All compression jobs completed successfully")
         
         # STEP 3: Generate fastp jobs AFTER compression is done
         logging.info("\n=== STEP 3: Generating fastp jobs ===")
@@ -397,16 +425,15 @@ def main():
                 max_wait_time=args.max_wait_time
             )
             
-            if not fastp_result['all_successful']:
-                error_msg = f"Fastp step failed: {len(fastp_result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
-                logging.error(error_msg)
+            # Print comprehensive summary
+            fastp_success = print_job_summary("Fastp", fastp_result, len(all_fastp_jobs))
+            
+            if not fastp_success:
                 if args.abort_on_failure:
                     logging.error("Aborting workflow due to fastp failures")
                     sys.exit(1)
                 else:
                     logging.warning("Workflow completed despite fastp failures - data may be incomplete")
-            else:
-                logging.info("All fastp jobs completed successfully")
             
             logging.info("\nQC workflow completed successfully!")
         else:

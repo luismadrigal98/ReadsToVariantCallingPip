@@ -125,7 +125,7 @@ def get_sample_structure(input_directories):
     return samples
 
 def generate_split_jobs(input_dirs, output_dirs, job_dirs, lines=4000000, partition="sixhour", 
-                        time="6:00:00", email=None, mem_per_cpu="5g", cpus=10):
+                        time="6:00:00", email=None, mem_per_cpu="5g", cpus=10, constraint=None):
     """
     Generate SLURM job scripts to decompress and split FASTQ files.
     Handles both single-end and paired-end files.
@@ -165,6 +165,8 @@ def generate_split_jobs(input_dirs, output_dirs, job_dirs, lines=4000000, partit
                     script.write(f"#SBATCH --job-name=split_{name}job\n")
                     script.write(f"#SBATCH --output={os.path.join(job_dir, f'split_{name}output')}\n")
                     script.write(f"#SBATCH --partition={partition}\n")
+                    if constraint:
+                        script.write(f"#SBATCH --constraint={constraint}\n")
                     script.write("#SBATCH --nodes=1\n")
                     script.write("#SBATCH --ntasks=1\n")
                     script.write(f"#SBATCH --cpus-per-task={cpus}\n")
@@ -187,7 +189,7 @@ def generate_split_jobs(input_dirs, output_dirs, job_dirs, lines=4000000, partit
 
 def generate_compress_jobs(batch_dirs, job_dirs, partition="sixhour", 
                         time="6:00:00", email="l338m483@ku.edu", 
-                        mem_per_cpu="5g", cpus=10):
+                        mem_per_cpu="5g", cpus=10, constraint=None):
     """
     Generate SLURM job scripts to compress split FASTQ files.
     
@@ -223,6 +225,8 @@ def generate_compress_jobs(batch_dirs, job_dirs, partition="sixhour",
                     script.write(f"#SBATCH --job-name=gzip_in_batch_{locator}_job\n")
                     script.write(f"#SBATCH --output={os.path.join(job_dir, f'gzip_in_batch_{locator}_output')}\n")
                     script.write(f"#SBATCH --partition={partition}\n")
+                    if constraint:
+                        script.write(f"#SBATCH --constraint={constraint}\n")
                     script.write("#SBATCH --nodes=1\n")
                     script.write("#SBATCH --ntasks=1\n")
                     script.write(f"#SBATCH --cpus-per-task={cpus}\n")
@@ -248,7 +252,7 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="fastp",
                         fastp_control_param="",
                         partition="sixhour", time="6:00:00", email=None, 
                         mem_per_cpu="5g", cpus=10, r1_pattern="_R1_", r2_pattern="_R2_",
-                        sample_id_method="auto"):
+                        sample_id_method="auto", constraint=None):
     """
     Generate SLURM job scripts to run fastp on FASTQ files, handling both paired and single-end reads.
     
@@ -303,6 +307,8 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="fastp",
                     script.write(f"#SBATCH --job-name=fastp_paired_{sample_id}_job\n")
                     script.write(f"#SBATCH --output={os.path.join(job_dir, f'fastp_paired_{sample_id}_output')}\n")
                     script.write(f"#SBATCH --partition={partition}\n")
+                    if constraint:
+                        script.write(f"#SBATCH --constraint={constraint}\n")
                     script.write("#SBATCH --nodes=1\n")
                     script.write("#SBATCH --ntasks=1\n")
                     script.write(f"#SBATCH --cpus-per-task={cpus}\n")
@@ -373,6 +379,8 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="fastp",
                     script.write(f"#SBATCH --job-name=fastp_single_{sample_id}_job\n")
                     script.write(f"#SBATCH --output={os.path.join(job_dir, f'fastp_single_{sample_id}_output')}\n")
                     script.write(f"#SBATCH --partition={partition}\n")
+                    if constraint:
+                        script.write(f"#SBATCH --constraint={constraint}\n")
                     script.write("#SBATCH --nodes=1\n")
                     script.write("#SBATCH --ntasks=1\n")
                     script.write(f"#SBATCH --cpus-per-task={cpus}\n")

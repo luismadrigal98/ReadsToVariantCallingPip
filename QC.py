@@ -90,6 +90,12 @@ def main():
     common_parser.add_argument("--time", type=str, default="6:00:00", help="Time limit for jobs")
     common_parser.add_argument("--mem-per-cpu", type=str, default="5g", help="Memory per CPU")
     common_parser.add_argument("--cpus", type=int, default=10, help="Number of CPUs per task")
+    common_parser.add_argument("--constraint", type=str, default="avx2&noib", 
+                            help="SLURM node constraints (default: avx2&noib for CPU-only nodes)")
+    common_parser.add_argument("--exclude-gpu", action="store_true", default=True,
+                            help="Exclude GPU nodes (recommended for genomics pipeline)")
+    common_parser.add_argument("--prefer-ib", action="store_true", 
+                            help="Prefer InfiniBand nodes for better I/O performance")
     
     # Split command
     split_parser = subparsers.add_parser("split", parents=[common_parser], help="Split FASTQ files")
@@ -216,7 +222,7 @@ def main():
             sys.exit(1)
         generate_split_jobs(args.input_dirs, args.output_dirs, args.job_dirs, lines=args.lines,
                         partition=args.partition, time=args.time, email=args.email, 
-                        mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
+                        mem_per_cpu=args.mem_per_cpu, cpus=args.cpus, constraint=args.constraint)
         
         if args.submit:
             # Submit split jobs with retry

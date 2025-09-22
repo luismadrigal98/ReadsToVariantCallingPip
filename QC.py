@@ -38,8 +38,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 
 # Import the fastq utilities module
-from fastq_utilities import *
-from slurm_utilities import *
+from src.fastq_utilities import *
+from src.slurm_utilities import *
 
 def print_job_summary(step_name, result, total_jobs):
     """

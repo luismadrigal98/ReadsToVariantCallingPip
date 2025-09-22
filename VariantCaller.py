@@ -26,9 +26,45 @@ logging.basicConfig(level=logging.INFO,
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 
 # Import utilities
-from variant_caller_utilities import *
-from slurm_utilities import *
-from miscellaneous_utilities import atomize_vcf_file
+from src.variant_caller_utilities import *
+from src.slurm_utilities import *
+from src.miscellaneous_utilities import atomize_vcf_file
+
+def print_job_summary(step_name, result, total_jobs):
+    """
+    Print a comprehensive summary of job execution results.
+    
+    Parameters:
+    step_name (str): Name of the pipeline step (e.g., "FreeBayes", "BCFtools", "GATK")
+    result (dict): Result dictionary from submit_jobs_with_retry
+    total_jobs (int): Total number of jobs submitted
+    """
+    logging.info(f"\n{'='*60}")
+    logging.info(f"{step_name.upper()} JOBS SUMMARY")
+    logging.info(f"{'='*60}")
+    
+    completed = len(result['completed'])
+    failed = len(result['final_failures'])
+    success_rate = (completed / total_jobs * 100) if total_jobs > 0 else 0
+    
+    logging.info(f"Total jobs submitted:    {total_jobs}")
+    logging.info(f"Successfully completed:  {completed}")
+    logging.info(f"Final failures:          {failed}")
+    logging.info(f"Success rate:            {success_rate:.1f}%")
+    
+    if result['all_successful']:
+        logging.info(f"✅ ALL {step_name.upper()} JOBS COMPLETED SUCCESSFULLY!")
+    else:
+        logging.warning(f"⚠️  {failed} {step_name.upper()} JOBS FAILED AFTER RETRIES")
+        if result['final_failures']:
+            logging.warning("Failed job scripts:")
+            for job in result['final_failures'][:5]:  # Show first 5 failures
+                logging.warning(f"  - {job}")
+            if len(result['final_failures']) > 5:
+                logging.warning(f"  ... and {len(result['final_failures']) - 5} more")
+    
+    logging.info(f"{'='*60}\n")
+    return result['all_successful']
 
 def main():
     """Main function to parse arguments and execute variant calling."""
@@ -39,6 +75,8 @@ def main():
     common_parser = argparse.ArgumentParser(add_help=False)
     common_parser.add_argument("--partition", type=str, default="sixhour",
                             help="SLURM partition to use")
+    common_parser.add_argument("--constraint", type=str, default="avx2&noib",
+                            help="SLURM constraint for node selection (default: CPU-only nodes)")
     common_parser.add_argument("--time", type=str, default="6:00:00",
                             help="Time limit for jobs (format: HH:MM:SS)")
     common_parser.add_argument("--email", type=str, default="l338m483@ku.edu",
@@ -49,13 +87,13 @@ def main():
                             help="Number of threads per task")
     common_parser.add_argument("--submit", action="store_true",
                             help="Submit jobs to SLURM")
-    common_parser.add_argument("--max-jobs", type=int, default=5000,
+    common_parser.add_argument("--max-jobs", type=int, default=500,
                             help="Maximum number of jobs to submit at once")
-    common_parser.add_argument("--check-interval", type=int, default=60,
+    common_parser.add_argument("--check-interval", type=int, default=120,
                             help="Seconds between job status checks")
     common_parser.add_argument("--max-wait-time", type=int, default=86400,
                             help="Maximum seconds to wait for jobs")
-    common_parser.add_argument("--max-retries", type=int, default=1,
+    common_parser.add_argument("--max-retries", type=int, default=2,
                             help="Maximum number of retry attempts for failed jobs")
     common_parser.add_argument("--abort-on-failure", action="store_true",
                             help="Abort workflow if jobs fail after retries")
@@ -180,7 +218,8 @@ def main():
             email=args.email,
             mem_per_cpu=args.mem_per_cpu,
             caller_params=args.caller_params,
-            threads=args.threads
+            threads=args.threads,
+            constraint=args.constraint
         )
         
         if args.submit and jobs:
@@ -194,16 +233,13 @@ def main():
                 max_wait_time=args.max_wait_time
             )
             
-            if not result['all_successful']:
-                error_msg = f"Variant calling failed: {len(result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
-                logging.error(error_msg)
+            vc_successful = print_job_summary("Variant Calling", result, len(jobs))
+            if not vc_successful:
                 if args.abort_on_failure:
                     logging.error("Aborting due to variant calling failures")
                     sys.exit(1)
                 else:
                     logging.warning("Variant calling completed with some failures - data may be incomplete")
-            else:
-                logging.info("All variant calling jobs completed successfully")
     
     elif args.command == "joint-call":
         if (len(args.input_dirs_1) != len(args.input_dirs_2) or 
@@ -239,7 +275,8 @@ def main():
             mem_per_cpu=args.mem_per_cpu,
             caller_params=args.caller_params,
             paired_input_dirs=args.input_dirs_2,
-            threads=args.threads
+            threads=args.threads,
+            constraint=args.constraint
         )
         
         if args.submit and jobs:
@@ -253,16 +290,13 @@ def main():
                 max_wait_time=args.max_wait_time
             )
             
-            if not result['all_successful']:
-                error_msg = f"Joint variant calling failed: {len(result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
-                logging.error(error_msg)
+            joint_successful = print_job_summary("Joint Variant Calling", result, len(jobs))
+            if not joint_successful:
                 if args.abort_on_failure:
                     logging.error("Aborting due to joint variant calling failures")
                     sys.exit(1)
                 else:
                     logging.warning("Joint variant calling completed with some failures - data may be incomplete")
-            else:
-                logging.info("All joint variant calling jobs completed successfully")
     
     elif args.command == "merge":
         if len(args.input_dirs) != len(args.output_dirs) or len(args.input_dirs) != len(args.job_dirs):
@@ -296,16 +330,13 @@ def main():
                 max_wait_time=args.max_wait_time
             )
             
-            if not result['all_successful']:
-                error_msg = f"VCF merge failed: {len(result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
-                logging.error(error_msg)
+            merge_successful = print_job_summary("VCF Merge", result, len(jobs))
+            if not merge_successful:
                 if args.abort_on_failure:
                     logging.error("Aborting due to VCF merge failures")
                     sys.exit(1)
                 else:
                     logging.warning("VCF merge completed with some failures - data may be incomplete")
-            else:
-                logging.info("All VCF merge jobs completed successfully")
 
     elif args.command == "atomize":
         # Run atomization

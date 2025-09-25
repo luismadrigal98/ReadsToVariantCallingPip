@@ -101,7 +101,7 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
                                 window_size=1000000, variant_caller="freebayes",
                                 caller_path=None, partition="sixhour", time="6:00:00",
                                 email="l338m483@ku.edu", mem_per_cpu="30g",
-                                caller_params=None, paired_input_dirs=None, threads=1):
+                                caller_params=None, paired_input_dirs=None, threads=1, constraint=None):
     """
     Generate SLURM jobs for variant calling using a specified caller.
     
@@ -294,6 +294,8 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
                     script.write(f"#SBATCH --job-name={script_name}_{i}_job\n")
                     script.write(f"#SBATCH --output={os.path.join(job_dir, f'{script_name}_{i}_output')}\n")
                     script.write(f"#SBATCH --partition={partition}\n")
+                    if constraint:
+                        script.write(f"#SBATCH --constraint={constraint}\n")
                     script.write("#SBATCH --nodes=1\n")
                     script.write("#SBATCH --ntasks=1\n")
                     script.write(f"#SBATCH --cpus-per-task={threads}\n")
@@ -356,7 +358,7 @@ def merge_vcf_files_jobs_generator(input_dirs, output_dirs, job_dirs,
                                   partition="sixhour", time="6:00:00",
                                   email="l338m483@ku.edu", mem_per_cpu="30g",
                                   threads=1, merge_command='concat',
-                                  sample_names=None, merge_mode='by_chromosome'):
+                                  sample_names=None, merge_mode='by_chromosome', constraint=None):
     """
     Generate jobs to merge VCF files globally or by chromosome.
     
@@ -419,6 +421,8 @@ def merge_vcf_files_jobs_generator(input_dirs, output_dirs, job_dirs,
                 script.write(f"#SBATCH --job-name=merge_{sample_name}_all_job\n")
                 script.write(f"#SBATCH --output={os.path.join(job_dir, 'merge_all_output')}\n")
                 script.write(f"#SBATCH --partition={partition}\n")
+                if constraint:
+                    script.write(f"#SBATCH --constraint={constraint}\n")
                 script.write("#SBATCH --nodes=1\n")
                 script.write("#SBATCH --ntasks=1\n")
                 script.write(f"#SBATCH --cpus-per-task={threads}\n")
@@ -501,6 +505,8 @@ def merge_vcf_files_jobs_generator(input_dirs, output_dirs, job_dirs,
                     script.write(f"#SBATCH --job-name=merge_{sample_name}_{chromosome}_job\n")
                     script.write(f"#SBATCH --output={os.path.join(job_dir, f'merge_Chr_{chromosome}_output')}\n")
                     script.write(f"#SBATCH --partition={partition}\n")
+                    if constraint:
+                        script.write(f"#SBATCH --constraint={constraint}\n")
                     script.write("#SBATCH --nodes=1\n")
                     script.write("#SBATCH --ntasks=1\n")
                     script.write(f"#SBATCH --cpus-per-task={threads}\n")

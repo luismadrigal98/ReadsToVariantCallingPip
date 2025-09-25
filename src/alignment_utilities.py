@@ -88,7 +88,7 @@ def detect_bam_files(input_dir):
 def generate_bwa_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
                     bwa_path="/kuhpc/sw/conda/latest/envs/bioconda/bin/bwa", 
                     partition="sixhour", time="6:00:00", 
-                    email="l338m483@ku.edu", mem_per_cpu="5g", cpus=10):
+                    email="l338m483@ku.edu", mem_per_cpu="5g", cpus=10, constraint=None):
     """
     Generate SLURM job scripts to run BWA on preprocessed FASTQ files.
     
@@ -134,6 +134,8 @@ def generate_bwa_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
                     script.write(f"#SBATCH --job-name=bwa_{sample_name}_job\n")
                     script.write(f"#SBATCH --output={os.path.join(job_dir, f'bwa_{sample_name}_output')}\n")
                     script.write(f"#SBATCH --partition={partition}\n")
+                    if constraint:
+                        script.write(f"#SBATCH --constraint={constraint}\n")
                     script.write("#SBATCH --nodes=1\n")
                     script.write("#SBATCH --ntasks=1\n")
                     script.write(f"#SBATCH --cpus-per-task={cpus}\n")
@@ -169,6 +171,8 @@ def generate_bwa_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
                     script.write(f"#SBATCH --job-name=bwa_{sample_name}_job\n")
                     script.write(f"#SBATCH --output={os.path.join(job_dir, f'bwa_{sample_name}_output')}\n")
                     script.write(f"#SBATCH --partition={partition}\n")
+                    if constraint:
+                        script.write(f"#SBATCH --constraint={constraint}\n")
                     script.write("#SBATCH --nodes=1\n")
                     script.write("#SBATCH --ntasks=1\n")
                     script.write(f"#SBATCH --cpus-per-task={cpus}\n")
@@ -192,7 +196,7 @@ def generate_bwa_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
 def generate_sam_to_bam_jobs(input_dirs, output_dirs, job_dirs, 
                             samtools_path="samtools", partition="sixhour", 
                             time="6:00:00", email="l338m483@ku.edu", 
-                            mem_per_cpu="5g", cpus=4):
+                            mem_per_cpu="5g", cpus=4, constraint=None):
     """
     Generate SLURM job scripts to convert SAM files to sorted BAM files.
     
@@ -235,6 +239,8 @@ def generate_sam_to_bam_jobs(input_dirs, output_dirs, job_dirs,
                     script.write(f"#SBATCH --job-name=bam_{sample_name}_job\n")
                     script.write(f"#SBATCH --output={os.path.join(job_dir, f'bam_{sample_name}_output')}\n")
                     script.write(f"#SBATCH --partition={partition}\n")
+                    if constraint:
+                        script.write(f"#SBATCH --constraint={constraint}\n")
                     script.write("#SBATCH --nodes=1\n")
                     script.write("#SBATCH --ntasks=1\n")
                     script.write(f"#SBATCH --cpus-per-task={cpus}\n")
@@ -292,7 +298,7 @@ def generate_stampy_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
                         stampy_path, 
                         samtools_path,
                         partition="sixhour", time="6:00:00", 
-                        email="l338m483@ku.edu", mem_per_cpu="5g", cpus=3):
+                        email="l338m483@ku.edu", mem_per_cpu="5g", cpus=3, constraint=None):
     """
     Generate SLURM job scripts to run Stampy on sorted BAM files.
     
@@ -342,6 +348,8 @@ def generate_stampy_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
                     script.write(f"#SBATCH --job-name=stampy_{sample_name}_job\n")
                     script.write(f"#SBATCH --output={os.path.join(job_dir, f'stampy_{sample_name}_output')}\n")
                     script.write(f"#SBATCH --partition={partition}\n")
+                    if constraint:
+                        script.write(f"#SBATCH --constraint={constraint}\n")
                     script.write("#SBATCH --nodes=1\n")
                     script.write("#SBATCH --ntasks=1\n")
                     script.write(f"#SBATCH --cpus-per-task={cpus}\n")

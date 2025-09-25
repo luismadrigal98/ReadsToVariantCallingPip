@@ -316,7 +316,8 @@ def main():
             threads=args.threads,
             merge_command=args.merge_command,
             sample_names=args.sample_names,
-            merge_mode=args.merge_mode
+            merge_mode=args.merge_mode,
+            constraint=args.constraint
         )
         
         if args.submit and jobs:

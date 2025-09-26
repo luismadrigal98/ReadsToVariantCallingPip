@@ -116,7 +116,9 @@ def generate_bwa_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
             # Process paired-end files
             for r1_file, r2_file in file_types['paired_files']:
                 # Extract a meaningful name for the job and output
-                sample_name = re.sub(r'_R1.*preprocessed\.fastq\.gz', '', r1_file)
+                # Keep chunk suffixes for unique processing: handles any number of letters (aa, abc, aaaa, etc.)
+                # JKK-98A_S1_L001_SET3_R1_001_aa_preprocessed.fastq.gz -> JKK-98A_S1_L001_SET3_001_aa
+                sample_name = re.sub(r'_R1_001_([a-z]+)_preprocessed\.fastq\.gz', r'_001_\1', r1_file)
                 
                 # Output file name
                 out_sam = f"{sample_name}_bwa-aligned.sam.gz"
@@ -154,7 +156,8 @@ def generate_bwa_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
             # Process single-end files
             for single_file in file_types['single_files']:
                 # Extract a meaningful name for the job and output
-                sample_name = re.sub(r'_preprocessed\.fastq\.gz', '', single_file)
+                # Keep chunk suffixes for unique processing: handles any number of letters
+                sample_name = re.sub(r'_([a-z]+)_preprocessed\.fastq\.gz', r'_\1', single_file)
                 
                 # Output file name
                 out_sam = f"{sample_name}_bwa-aligned.sam.gz"

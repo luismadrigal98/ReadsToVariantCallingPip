@@ -45,7 +45,7 @@ cd StampyToFreeBayesPip
 
 3. Make the pipeline scripts executable:
 ```bash
-chmod +x QC.py StampyRunner.py BamProcessor.py VariantCaller.py
+chmod +x QC.py MapRunner.py BamProcessor.py VariantCaller.py
 ```
 
 ## Pipeline Components
@@ -54,7 +54,7 @@ chmod +x QC.py StampyRunner.py BamProcessor.py VariantCaller.py
 
 Handles preprocessing of FASTQ files using fastp, with options for splitting large files.
 
-### 2. StampyRunner.py - Sequence Alignment
+### 2. MapRunner.py - Sequence Alignment
 
 Performs alignment using BWA followed by Stampy for improved mapping quality.
 

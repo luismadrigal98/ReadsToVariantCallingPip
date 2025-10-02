@@ -9,7 +9,6 @@ import subprocess
 import sys
 import logging
 
-
 def atomize_vcf_file(input_file, output_file, bcftools_path="bcftools", verbose=False, debug_mode=False):
     """Atomize a VCF file into individual variant calls."""
     

@@ -366,11 +366,15 @@ def generate_add_readgroups_jobs(input_dirs, job_dirs, read_group_libs=None,
                 # Extract sample name from filename
                 sample_name = re.sub(r'_.*$', '', bam_file)
                 
+                # Use year_ID as sample name for VCF (this is what appears in VCF files)
+                # If you want the original sample name in VCF, use sample_name instead
+                vcf_sample_name = year_ID  # This makes VCF show "2007A", "2007B", etc.
+                
                 # Create commands with proper Java memory allocation
                 picard_command = (f"{picard_path} -Xmx{int(mem_per_cpu.rstrip('gG')) * cpus}g AddOrReplaceReadGroups " 
                                 f"I={os.path.join(input_dir, bam_file)} "
                                 f"O={os.path.join(input_dir, bam_file.replace('.bam', '.wRG.bam'))} "
-                                f"RGID={sample_name} RGLB={year_ID} RGPL=illumina RGPU=unit1 RGSM={sample_name}")
+                                f"RGID={sample_name} RGLB={year_ID} RGPL=illumina RGPU=unit1 RGSM={vcf_sample_name}")
                 
                 mv_command = f"mv {os.path.join(input_dir, bam_file.replace('.bam', '.wRG.bam'))} {os.path.join(input_dir, bam_file)}"
                 

@@ -199,6 +199,24 @@ def generate_duplicate_processing_jobs(input_dirs, output_dirs_base, job_dirs,
     mem_per_cpu (str): Memory per CPU
     cpus (int): Number of CPUs per task
     """
+    # Calculate Java heap size (80% of total memory to leave room for overhead)
+    # Parse memory string to get numeric value
+    mem_value = mem_per_cpu.rstrip('gGmMkK')
+    mem_unit = mem_per_cpu[-1].lower()
+    
+    if mem_unit == 'g':
+        total_mem_gb = int(mem_value) * cpus
+        java_mem_gb = int(total_mem_gb * 0.8)
+    elif mem_unit == 'm':
+        total_mem_gb = int(mem_value) * cpus / 1024
+        java_mem_gb = int(total_mem_gb * 0.8)
+    else:
+        # Default to a safe value
+        java_mem_gb = 30
+    
+    # Ensure minimum memory for Picard
+    java_mem_gb = max(java_mem_gb, 8)
+    
     # Map duplicate mode to directory names and processing commands
     mode_configs = {
         "preserve": {
@@ -209,12 +227,12 @@ def generate_duplicate_processing_jobs(input_dirs, output_dirs_base, job_dirs,
         "mark": {
             "dir_suffix": "Pipeline.with.marked.duplicates",
             "name_suffix": "_pwmd",
-            "picard_cmd": f"{picard_path} MarkDuplicates TAGGING_POLICY=All {{input}} {{output}} {{metrics}} ASSUME_SORT_ORDER=coordinate",
+            "picard_cmd": f"{picard_path} -Xmx{java_mem_gb}g MarkDuplicates TAGGING_POLICY=All {{input}} {{output}} {{metrics}} ASSUME_SORT_ORDER=coordinate",
         },
         "mark_remove": {
             "dir_suffix": "Pipeline.without.duplicates",
             "name_suffix": "_pwod",
-            "picard_cmd": f"{picard_path} MarkDuplicates TAGGING_POLICY=All {{input}} {{output}} {{metrics}} ASSUME_SORT_ORDER=coordinate REMOVE_DUPLICATES=true",
+            "picard_cmd": f"{picard_path} -Xmx{java_mem_gb}g MarkDuplicates TAGGING_POLICY=All {{input}} {{output}} {{metrics}} ASSUME_SORT_ORDER=coordinate REMOVE_DUPLICATES=true",
         }
     }
     

@@ -239,6 +239,14 @@ Project/
 - Reduce `--cpus` if memory per CPU is limiting
 - Use smaller `--window-size` for variant calling
 
+#### Picard MarkDuplicates Out of Memory
+**Error**: `java.lang.OutOfMemoryError: Java heap space` when running duplicate marking/removal
+
+**Solution**: This issue was fixed in version 1.2. The pipeline now automatically allocates sufficient Java heap memory based on SLURM resources (80% of total allocated memory). For deduplication jobs, the default allocation is now 10g per CPU × 8 CPUs = 80GB total, with ~64GB available to Java. If you still encounter memory issues with very large BAM files:
+- Increase `--mem-per-cpu` (e.g., `--mem-per-cpu 15g`)
+- Increase `--cpus` to allocate more total memory
+- Process files individually with the `dedup` command rather than `workflow`
+
 ### Getting Help
 
 1. Check job output files for specific error messages

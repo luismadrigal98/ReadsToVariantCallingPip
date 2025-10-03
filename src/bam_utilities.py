@@ -313,6 +313,100 @@ def generate_duplicate_processing_jobs(input_dirs, output_dirs_base, job_dirs,
         except Exception as e:
             logging.error(f"Error processing directory {input_dir}: {e}")
 
+def generate_add_readgroups_jobs(input_dirs, job_dirs, read_group_libs=None,
+                                  samtools_path="samtools", picard_path="picard",
+                                  partition="sixhour", time="6:00:00",
+                                  email="l338m483@ku.edu", mem_per_cpu="5g", cpus=4):
+    """
+    Generate SLURM job scripts to add read groups to merged BAM files.
+    This should be run BEFORE duplicate processing.
+    
+    Parameters:
+    input_dirs (list): List of directories containing merged BAM files
+    job_dirs (list): List of directories for job scripts
+    read_group_libs (list): List of read group library IDs (e.g., ["2007A", "2007B", "2010A"])
+                           Must match length of input_dirs. If None, will try to auto-detect.
+    samtools_path (str): Path to samtools executable
+    picard_path (str): Path to picard executable
+    partition (str): SLURM partition to use
+    time (str): Time limit for jobs
+    email (str): Email for notifications
+    mem_per_cpu (str): Memory per CPU
+    cpus (int): Number of CPUs per task
+    """
+    # Validate read_group_libs if provided
+    if read_group_libs is not None and len(read_group_libs) != len(input_dirs):
+        raise ValueError(f"Length of read_group_libs ({len(read_group_libs)}) must match length of input_dirs ({len(input_dirs)})")
+    
+    for idx, (input_dir, job_dir) in enumerate(zip(input_dirs, job_dirs)):
+        create_directory(job_dir)
+        
+        try:
+            # Find merged BAM files
+            bam_files = [f for f in os.listdir(input_dir) if f.endswith('_merged_sorted.bam')]
+            
+            if not bam_files:
+                logging.warning(f"No merged BAM files found in {input_dir}")
+                continue
+            
+            # Determine the read group library ID
+            if read_group_libs is not None:
+                year_ID = read_group_libs[idx]
+                logging.info(f"Using manually specified read group library: {year_ID} for {input_dir}")
+            else:
+                # Auto-detect from directory path
+                year_match = re.search(r'/(\d{4})/(\d{4}[AB])_sequences', input_dir)
+                if year_match:
+                    year_ID = year_match.group(2)  # e.g., "2007B"
+                else:
+                    year_ID = "unknown"
+                logging.info(f"Auto-detected read group library: {year_ID} for {input_dir}")
+            
+            for bam_file in bam_files:
+                # Extract sample name from filename
+                sample_name = re.sub(r'_.*$', '', bam_file)
+                
+                # Create commands with proper Java memory allocation
+                picard_command = (f"{picard_path} -Xmx{int(mem_per_cpu.rstrip('gG')) * cpus}g AddOrReplaceReadGroups " 
+                                f"I={os.path.join(input_dir, bam_file)} "
+                                f"O={os.path.join(input_dir, bam_file.replace('.bam', '.wRG.bam'))} "
+                                f"RGID={sample_name} RGLB={year_ID} RGPL=illumina RGPU=unit1 RGSM={sample_name}")
+                
+                mv_command = f"mv {os.path.join(input_dir, bam_file.replace('.bam', '.wRG.bam'))} {os.path.join(input_dir, bam_file)}"
+                
+                # Create job script
+                job_script_path = os.path.join(job_dir, f"add_rg_{sample_name}_job.sh")
+                
+                with open(job_script_path, "w") as script:
+                    script.write("#!/bin/bash\n")
+                    script.write(f"#SBATCH --job-name=add_rg_{sample_name}\n")
+                    script.write(f"#SBATCH --output={os.path.join(job_dir, f'add_rg_{sample_name}_output')}\n")
+                    script.write(f"#SBATCH --partition={partition}\n")
+                    script.write("#SBATCH --nodes=1\n")
+                    script.write("#SBATCH --ntasks=1\n")
+                    script.write(f"#SBATCH --cpus-per-task={cpus}\n")
+                    script.write(f"#SBATCH --time={time}\n")
+                    script.write(f"#SBATCH --mail-user={email}\n")
+                    script.write("#SBATCH --mail-type=END,FAIL\n")
+                    script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
+                    script.write("\n")
+                    script.write("# Load required modules\n")
+                    script.write(f"export PATH=$(dirname {samtools_path}):$PATH\n")
+                    script.write("\n")
+                    script.write(f"cd {input_dir}\n")
+                    script.write("\n")
+                    script.write("# Add read groups to BAM file\n")
+                    script.write(f"{picard_command}\n")
+                    script.write("\n")
+                    script.write("# Replace original file with read-group-added version\n")
+                    script.write(f"{mv_command}\n")
+                
+                os.chmod(job_script_path, 0o755)
+                logging.info(f"Created add read groups job script: {job_script_path}")
+                
+        except Exception as e:
+            logging.error(f"Error processing directory {input_dir}: {e}")
+
 def generate_indexing_jobs(input_dirs, job_dirs, samtools_path="samtools", picard_path="picard",
                             partition="sixhour", time="16:00:00", 
                             email="l338m483@ku.edu", mem_per_cpu="5g", cpus=10):
@@ -342,24 +436,10 @@ def generate_indexing_jobs(input_dirs, job_dirs, samtools_path="samtools", picar
                 continue
             
             for bam_file in bam_files:
-                # Extract sample name for read groups
-                if "12A" in bam_file:
-                    year_ID = "2012A"
-                    sample_name = re.sub(r'_.*$', '', bam_file)
-                elif "12B" in bam_file:
-                    year_ID = "2012B"
-                    sample_name = re.sub(r'_.*$', '', bam_file)
-                else:
-                    year_ID = "unknown"
-                    sample_name = re.sub(r'_.*$', '', bam_file)
+                # Extract sample name for job naming
+                sample_name = re.sub(r'_.*$', '', bam_file)
                 
-                # Create commands
-                picard_command = (f"{picard_path} AddOrReplaceReadGroups " 
-                                f"I={os.path.join(input_dir, bam_file)} "
-                                f"O={os.path.join(input_dir, bam_file.replace('.bam', '.wRG.bam'))} "
-                                f"RGID={sample_name} RGLB={year_ID} RGPL=illumina RGPU=unit1 RGSM={sample_name}")
-                
-                mv_command = f"mv {os.path.join(input_dir, bam_file.replace('.bam', '.wRG.bam'))} {os.path.join(input_dir, bam_file)}"
+                # Create indexing command (no read group modification needed here)
                 index_command = f"{samtools_path} index -b {os.path.join(input_dir, bam_file)}"
                 
                 # Create job script
@@ -382,10 +462,6 @@ def generate_indexing_jobs(input_dirs, job_dirs, samtools_path="samtools", picar
                     script.write(f"export PATH=$(dirname {samtools_path}):$PATH\n")
                     script.write("\n")
                     script.write(f"cd {input_dir}\n")
-                    script.write("\n")
-                    script.write(f"{picard_command}\n")
-                    script.write(f"rm {os.path.join(input_dir, bam_file)}\n")
-                    script.write(f"{mv_command}\n")
                     script.write("\n")
                     script.write(f"{index_command}\n")
                 

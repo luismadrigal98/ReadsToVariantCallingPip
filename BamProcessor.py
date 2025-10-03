@@ -91,6 +91,16 @@ def main():
                             default="mark",
                             help="How to handle duplicate reads")
     
+    # Command: add-readgroups
+    rg_parser = subparsers.add_parser("add-readgroups", parents=[common_parser],
+                                      help="Add read groups to merged BAM files (required before dedup)")
+    rg_parser.add_argument("--input-dirs", type=str, nargs="+", required=True,
+                          help="Directories containing merged BAM files")
+    rg_parser.add_argument("--job-dirs", type=str, nargs="+", required=True,
+                          help="Directories for job scripts")
+    rg_parser.add_argument("--read-group-libs", type=str, nargs="+", required=True,
+                          help="Read group library IDs (one per input-dir, e.g., 2007A 2007B 2010A)")
+    
     # Command: index
     index_parser = subparsers.add_parser("index", parents=[common_parser],
                                         help="Index BAM files")
@@ -199,6 +209,47 @@ def main():
             if dedup_job_ids:
                 logging.info("Waiting for all duplicate processing jobs to complete...")
                 wait_for_jobs_to_complete(dedup_job_ids, 
+                                        check_interval=args.check_interval,
+                                        max_wait_time=args.max_wait_time)
+    
+    elif args.command == "add-readgroups":
+        if len(args.input_dirs) != len(args.job_dirs):
+            logging.error("Error: Number of input and job directories must match")
+            sys.exit(1)
+        
+        if len(args.input_dirs) != len(args.read_group_libs):
+            logging.error(f"Error: Number of read group libraries ({len(args.read_group_libs)}) must match number of input directories ({len(args.input_dirs)})")
+            logging.error(f"Input dirs: {len(args.input_dirs)}, Read group libs: {len(args.read_group_libs)}")
+            sys.exit(1)
+        
+        generate_add_readgroups_jobs(args.input_dirs, args.job_dirs, 
+                                      read_group_libs=args.read_group_libs,
+                                      samtools_path=args.samtools_path, picard_path=args.picard_path,
+                                      partition=args.partition, time=args.time, email=args.email,
+                                      mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
+        
+        if args.submit:
+            # Find and submit all add read groups jobs from all directories
+            logging.info("=== Submitting add read groups jobs from all directories ===")
+            all_rg_jobs = []
+            
+            # Collect all add RG jobs from all directories
+            for job_dir in args.job_dirs:
+                rg_jobs = [
+                    os.path.join(job_dir, f) for f in os.listdir(job_dir)
+                    if f.startswith("add_rg_") and f.endswith("_job.sh")
+                ]
+                all_rg_jobs.extend(rg_jobs)
+                logging.info(f"Found {len(rg_jobs)} add read groups jobs in {job_dir}")
+            
+            # Submit all RG jobs with limit
+            logging.info(f"Submitting {len(all_rg_jobs)} total add read groups jobs (max concurrent: {args.max_jobs})")
+            rg_job_ids = submit_jobs_with_limit(all_rg_jobs, args.max_jobs)
+            logging.info(f"Submitted {len(rg_job_ids)} add read groups jobs from all directories")
+            
+            if rg_job_ids:
+                logging.info("Waiting for all add read groups jobs to complete...")
+                wait_for_jobs_to_complete(rg_job_ids, 
                                         check_interval=args.check_interval,
                                         max_wait_time=args.max_wait_time)
     

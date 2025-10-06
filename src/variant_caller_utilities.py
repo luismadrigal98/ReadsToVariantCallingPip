@@ -521,6 +521,194 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
     
     return job_scripts
 
+def generate_global_variant_calling_jobs(input_dirs, output_dir, job_dir,
+                                        regions, reference_fasta, fai_path,
+                                        window_size=1000000, variant_caller="bcftools",
+                                        caller_path=None, partition="sixhour", time="6:00:00",
+                                        email="l338m483@ku.edu", mem_per_cpu="30g",
+                                        caller_params=None, threads=1, constraint=None,
+                                        output_prefix="global_variants"):
+    """
+    Generate SLURM jobs for GLOBAL variant calling - all BAM files from all directories called together.
+    
+    This creates one VCF per genomic window containing ALL samples from ALL input directories.
+    
+    Parameters:
+    input_dirs (list): List of directories containing BAM files (all will be combined)
+    output_dir (str): Single directory for variant calling output
+    job_dir (str): Single directory for job scripts
+    regions (list): List of regions/chromosomes to process
+    reference_fasta (str): Path to reference FASTA file
+    fai_path (str): Path to FASTA index file
+    window_size (int): Window size for chunking variant calling
+    variant_caller (str): Variant caller to use ('freebayes', 'bcftools', etc.)
+    caller_path (str): Path to variant caller executable
+    partition (str): SLURM partition
+    time (str): Job time limit
+    email (str): Notification email
+    mem_per_cpu (str): Memory per CPU
+    caller_params (str): Additional parameters for the variant caller
+    threads (int): Number of threads to use
+    constraint (str): SLURM node constraints
+    output_prefix (str): Prefix for output VCF files
+    
+    Returns:
+    list: List of generated job script paths
+    """
+    # Default paths for variant callers
+    default_paths = {
+        "freebayes": "/home/l338m483/.conda/envs/Python2.7/bin/freebayes",
+        "bcftools": "/kuhpc/sw/conda/latest/envs/bioconda/bin/bcftools",
+        "gatk": "gatk"
+    }
+    
+    # Default parameters for different callers
+    default_params = {
+        "freebayes": "-4 --max-coverage=5000",
+        "bcftools": "-Ou -a FORMAT/AD --max-depth 5000",
+        "gatk": "HaplotypeCaller --emit-ref-confidence GVCF"
+    }
+    
+    # Use default parameters if none specified
+    if caller_params is None:
+        caller_params = default_params.get(variant_caller, "")
+    
+    # Use default path if none specified
+    if caller_path is None:
+        caller_path = default_paths.get(variant_caller, variant_caller)
+    
+    # Parse reference index
+    chrom_lengths = parse_reference_index(fai_path)
+    
+    # If "all" in regions, use all chromosomes
+    if "all" in regions:
+        regions = list(chrom_lengths.keys())
+        logging.info(f"Processing all {len(regions)} sequences from reference genome")
+    
+    # Create output and job directories if they don't exist
+    create_directory(output_dir)
+    create_directory(job_dir)
+    
+    # Collect ALL BAM files from ALL input directories
+    all_bam_files = []
+    all_bam_paths = []
+    
+    logging.info(f"Collecting BAM files from {len(input_dirs)} directories for global variant calling")
+    
+    for input_dir in input_dirs:
+        bam_files = detect_bam_files(input_dir)
+        if not bam_files:
+            logging.warning(f"No BAM files found in {input_dir}")
+            continue
+        
+        # Validate BAM files
+        for bam_file in bam_files:
+            bam_path = os.path.join(input_dir, bam_file)
+            if validate_bam_file(bam_path):
+                # Check compatibility with reference
+                if check_reference_compatibility(reference_fasta, bam_path):
+                    all_bam_files.append(bam_file)
+                    all_bam_paths.append(bam_path)
+                else:
+                    logging.error(f"BAM file {bam_file} is incompatible with reference {reference_fasta}")
+            else:
+                logging.error(f"BAM file validation failed: {bam_file}")
+    
+    if not all_bam_paths:
+        logging.error("No valid BAM files found in any input directory")
+        return []
+    
+    logging.info(f"Found {len(all_bam_paths)} valid BAM files across all directories for global calling")
+    
+    # Track generated job scripts
+    job_scripts = []
+    
+    # Create a single BAM paths string for all variant calling commands
+    bam_paths_str = ' '.join(all_bam_paths)
+    
+    # Process each region of interest
+    for region in regions:
+        if region not in chrom_lengths:
+            logging.warning(f"Region {region} not found in reference index")
+            continue
+            
+        region_length = chrom_lengths[region]
+        position = 0
+        
+        # Generate jobs for windows across the region
+        while position < region_length:
+            start = position + 1
+            end = position + window_size
+            
+            if end > region_length:
+                end = region_length
+            
+            interval = f"{region}:{start}-{end}"
+            script_name = f"{variant_caller}_{interval.replace(':', '_')}"
+            
+            # Define output filename for the region
+            output_vcf = f"{output_prefix}_{interval.replace(':', '_')}_{variant_caller}_variants.vcf"
+            output_path = os.path.join(output_dir, output_vcf)
+            
+            # Create variant calling command
+            if variant_caller == "freebayes":
+                # For Freebayes
+                call_cmd = f"{caller_path} {caller_params} -r {interval} -f {reference_fasta} {bam_paths_str} > {output_path}"
+            
+            elif variant_caller == "bcftools":
+                # For bcftools with mpileup+call pipeline
+                # bcftools will automatically use read group sample names from BAM @RG headers
+                call_cmd = (f"{caller_path} mpileup --threads={threads} {caller_params} "
+                            f"-r {interval} -f {reference_fasta} {bam_paths_str} | "
+                            f"{caller_path} call -mv -Ov --threads={threads} -o {output_path}")
+            
+            elif variant_caller == "gatk":
+                # For GATK, we need to format the input differently
+                gatk_inputs = ' '.join([f"-I {bam_path}" for bam_path in all_bam_paths])
+                
+                # Calculate Java heap memory (80% of SLURM allocation, minimum 8GB)
+                mem_value = float(mem_per_cpu.rstrip('gGmM'))
+                total_mem_gb = mem_value * threads
+                java_mem_gb = max(8, int(total_mem_gb * 0.8))
+                
+                call_cmd = f"{caller_path} --java-options '-Xmx{java_mem_gb}g' {caller_params} -R {reference_fasta} {gatk_inputs} -L {interval} -O {output_path}"
+            else:
+                logging.error(f"Unsupported variant caller: {variant_caller}")
+                continue
+            
+            # Create job script
+            job_script_path = os.path.join(job_dir, f"{script_name}_global_job.sh")
+            
+            with open(job_script_path, "w") as script:
+                script.write("#!/bin/bash\n")
+                script.write(f"#SBATCH --job-name={script_name}_global_job\n")
+                script.write(f"#SBATCH --output={os.path.join(job_dir, f'{script_name}_global_output')}\n")
+                script.write(f"#SBATCH --partition={partition}\n")
+                if constraint:
+                    script.write(f"#SBATCH --constraint={constraint}\n")
+                script.write("#SBATCH --nodes=1\n")
+                script.write("#SBATCH --ntasks=1\n")
+                script.write(f"#SBATCH --cpus-per-task={threads}\n")
+                script.write(f"#SBATCH --time={time}\n")
+                script.write(f"#SBATCH --mail-user={email}\n")
+                script.write("#SBATCH --mail-type=FAIL\n")
+                script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
+                script.write("\n")
+                
+                # Write the command
+                script.write(f"{call_cmd}\n")
+            
+            # Make executable
+            os.chmod(job_script_path, 0o755)
+            job_scripts.append(job_script_path)
+            
+            logging.info(f"Created global variant calling job for {len(all_bam_paths)} samples in region {interval}: {job_script_path}")
+            
+            # Update position for next window
+            position = end
+    
+    return job_scripts
+
 def sort_vcf_files_by_region(vcf_files):
     """
     Sort VCF files by chromosome and position.

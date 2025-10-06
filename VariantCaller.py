@@ -127,7 +127,7 @@ def main():
                             default="/kuhpc/sw/conda/latest/envs/bioconda/bin/samtools",
                             help="Path to samtools executable")
     
-    # Joint call command
+    # Joint call command (paired directories - one VCF per pair)
     joint_parser = subparsers.add_parser("joint-call", parents=[common_parser],
                                         help="Run joint variant calling with paired directories")
     joint_parser.add_argument("--reference", type=str, required=True,
@@ -147,6 +147,30 @@ def main():
                             help="Path to variant caller executable")
     joint_parser.add_argument("--caller-params", type=str, default=None,
                             help="Additional parameters for variant caller")
+    
+    # Global call command (all BAM files together - one global VCF)
+    global_parser = subparsers.add_parser("global-call", parents=[common_parser],
+                                         help="Run global variant calling with ALL BAM files from ALL directories")
+    global_parser.add_argument("--reference", type=str, required=True,
+                             help="Path to reference FASTA file")
+    global_parser.add_argument("--input-dirs", type=str, nargs="+", required=True,
+                             help="List of ALL directories containing BAM files (will be combined)")
+    global_parser.add_argument("--output-dir", type=str, required=True,
+                             help="Directory for variant calling output")
+    global_parser.add_argument("--job-dir", type=str, required=True,
+                             help="Directory for job scripts")
+    global_parser.add_argument("--output-prefix", type=str, default="global_variants",
+                             help="Prefix for output VCF files")
+    global_parser.add_argument("--variant-caller", type=str, default="bcftools",
+                             choices=["freebayes", "bcftools", "gatk"],
+                             help="Variant caller to use")
+    global_parser.add_argument("--caller-path", type=str, default=None,
+                             help="Path to variant caller executable")
+    global_parser.add_argument("--caller-params", type=str, default=None,
+                             help="Additional parameters for variant caller")
+    global_parser.add_argument("--samtools-path", type=str,
+                             default="/kuhpc/sw/conda/latest/envs/bioconda/bin/samtools",
+                             help="Path to samtools executable")
     
     # Merge command
     merge_parser = subparsers.add_parser("merge", parents=[common_parser],
@@ -297,6 +321,57 @@ def main():
                     sys.exit(1)
                 else:
                     logging.warning("Joint variant calling completed with some failures - data may be incomplete")
+    
+    elif args.command == "global-call":
+        # Check if the reference exists and create an index if needed
+        if not os.path.exists(args.reference):
+            logging.error(f"Reference file not found: {args.reference}")
+            sys.exit(1)
+        
+        fai_path = args.reference + ".fai"
+        if not os.path.exists(fai_path):
+            logging.info(f"Reference index not found, creating one...")
+            create_fasta_index(args.reference, args.samtools_path)
+            
+        # Generate global variant calling jobs (all BAM files together)
+        jobs = generate_global_variant_calling_jobs(
+            input_dirs=args.input_dirs,
+            output_dir=args.output_dir,
+            job_dir=args.job_dir,
+            regions=args.regions,
+            reference_fasta=args.reference,
+            fai_path=fai_path,
+            window_size=args.window_size,
+            variant_caller=args.variant_caller,
+            caller_path=args.caller_path,
+            partition=args.partition,
+            time=args.time,
+            email=args.email,
+            mem_per_cpu=args.mem_per_cpu,
+            caller_params=args.caller_params,
+            threads=args.threads,
+            constraint=args.constraint,
+            output_prefix=args.output_prefix
+        )
+        
+        if args.submit and jobs:
+            # Submit global variant calling jobs with retry capability
+            logging.info(f"Submitting {len(jobs)} global variant calling jobs with retry capability")
+            result = submit_jobs_with_retry(
+                job_scripts=jobs,
+                max_jobs=args.max_jobs,
+                max_retries=args.max_retries,
+                check_interval=args.check_interval,
+                max_wait_time=args.max_wait_time
+            )
+            
+            global_successful = print_job_summary("Global Variant Calling", result, len(jobs))
+            if not global_successful:
+                if args.abort_on_failure:
+                    logging.error("Aborting due to global variant calling failures")
+                    sys.exit(1)
+                else:
+                    logging.warning("Global variant calling completed with some failures - data may be incomplete")
     
     elif args.command == "merge":
         if len(args.input_dirs) != len(args.output_dirs) or len(args.input_dirs) != len(args.job_dirs):

@@ -11,6 +11,115 @@ def create_directory(directory):
         os.makedirs(directory, exist_ok=True)
         logging.info(f"Created directory: {directory}")
 
+def validate_bam_file(bam_path):
+    """
+    Validate that a BAM file exists and is not empty.
+    
+    Parameters:
+    bam_path (str): Path to BAM file
+    
+    Returns:
+    bool: True if valid, False otherwise
+    """
+    if not os.path.exists(bam_path):
+        logging.error(f"BAM file does not exist: {bam_path}")
+        return False
+    
+    if os.path.getsize(bam_path) == 0:
+        logging.error(f"BAM file is empty: {bam_path}")
+        return False
+    
+    # Check for BAM index
+    bai_path = bam_path + ".bai"
+    if not os.path.exists(bai_path):
+        logging.warning(f"BAM index not found: {bai_path}. Variant calling may be slower.")
+    
+    return True
+
+def validate_vcf_files(vcf_files):
+    """
+    Validate that VCF files exist and are not empty.
+    
+    Parameters:
+    vcf_files (list): List of VCF file paths
+    
+    Returns:
+    tuple: (valid_files, invalid_files)
+    """
+    valid_files = []
+    invalid_files = []
+    
+    for vcf_file in vcf_files:
+        if not os.path.exists(vcf_file):
+            logging.warning(f"VCF file does not exist: {vcf_file}")
+            invalid_files.append(vcf_file)
+        elif os.path.getsize(vcf_file) == 0:
+            logging.warning(f"VCF file is empty: {vcf_file}")
+            invalid_files.append(vcf_file)
+        else:
+            valid_files.append(vcf_file)
+    
+    return valid_files, invalid_files
+
+def check_reference_compatibility(reference_fasta, bam_file):
+    """
+    Check if BAM file contigs are compatible with reference FASTA.
+    Requires samtools to be available.
+    
+    Parameters:
+    reference_fasta (str): Path to reference FASTA
+    bam_file (str): Path to BAM file
+    
+    Returns:
+    bool: True if compatible or cannot verify, False if incompatible
+    """
+    try:
+        import subprocess
+        
+        # Get BAM header contigs
+        result = subprocess.run(
+            ['samtools', 'view', '-H', bam_file],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        if result.returncode != 0:
+            logging.warning(f"Could not read BAM header for {bam_file}")
+            return True  # Assume compatible if we can't check
+        
+        # Parse reference names from @SQ lines
+        bam_contigs = set()
+        for line in result.stdout.split('\n'):
+            if line.startswith('@SQ'):
+                for part in line.split('\t'):
+                    if part.startswith('SN:'):
+                        bam_contigs.add(part[3:])
+        
+        # Get reference contigs from .fai file
+        fai_path = reference_fasta + ".fai"
+        if os.path.exists(fai_path):
+            ref_contigs = set()
+            with open(fai_path, 'r') as fai:
+                for line in fai:
+                    ref_contigs.add(line.split('\t')[0])
+            
+            # Check if there's overlap
+            common_contigs = bam_contigs.intersection(ref_contigs)
+            if not common_contigs:
+                logging.error(f"No common contigs between BAM {bam_file} and reference {reference_fasta}")
+                logging.error(f"BAM contigs: {sorted(list(bam_contigs))[:5]}...")
+                logging.error(f"Reference contigs: {sorted(list(ref_contigs))[:5]}...")
+                return False
+            
+            logging.debug(f"Found {len(common_contigs)} common contigs between BAM and reference")
+        
+        return True
+        
+    except Exception as e:
+        logging.warning(f"Could not verify reference compatibility: {e}")
+        return True  # Assume compatible if we can't check
+
 def parse_reference_index(fai_path):
     """
     Parse a FASTA index file to get chromosome lengths.
@@ -30,35 +139,67 @@ def parse_reference_index(fai_path):
 
 def extract_sample_names_from_bams(bam_files, suffix="_filtered_merged_sorted.bam"):
     """
-    Extract sample names from BAM filenames and normalize year patterns.
+    Extract sample names from BAM filenames, preserving library IDs.
+    
+    This function extracts sample names while preserving year-based library identifiers
+    (e.g., "2007A", "2012B") that are used as sample names in VCF files.
     
     Parameters:
     bam_files (list): List of BAM filenames
-    suffix (str): Suffix to remove from BAM filenames
+    suffix (str): Suffix to remove from BAM filenames (or None to try multiple patterns)
     
     Returns:
-    list: List of cleaned sample names
+    list: List of cleaned sample names with library IDs preserved
     """
     sample_names = []
+    
+    # Common BAM file suffixes to try
+    suffixes_to_try = [
+        suffix,
+        "_filtered_merged_sorted.bam",
+        "_dedup.bam",
+        "_marked_duplicates.bam",
+        "_rg.bam",
+        ".bam"
+    ]
+    
     for bam_file in bam_files:
-        base_name = bam_file.replace(suffix, "")
-        # Use regex to normalize year patterns (e.g., 12A, 12B, 2012A, etc.)
-        sample_name = re.sub(r'(\d{2,4})([A-Z])', r'\1', base_name)
-        if (len(sample_name.split('_')) > 1):
-            sample_name = sample_name.split('_')[0]
+        base_name = bam_file
+        
+        # Try to remove suffix
+        for suf in suffixes_to_try:
+            if base_name.endswith(suf):
+                base_name = base_name.replace(suf, "")
+                break
+        
+        # Extract the primary identifier (preserve library IDs like "2007A", "2012B")
+        # Split by underscore and take the first part which typically contains the year+ID
+        parts = base_name.split('_')
+        if parts:
+            sample_name = parts[0]
+        else:
+            sample_name = base_name
+        
         # Remove any leading/trailing whitespace
         sample_name = sample_name.strip()
         sample_names.append(sample_name)
+    
     return sample_names
 
-def detect_bam_files(input_dir, bam_type=None, suffix="_filtered_merged_sorted.bam"):
+def detect_bam_files(input_dir, bam_type=None, suffix=None):
     """
     Find BAM files in a directory, optionally filtering by type.
+    
+    This function can detect BAM files with various suffixes including:
+    - Filtered/merged: _filtered_merged_sorted.bam
+    - Deduplicated: _dedup.bam, _marked_duplicates.bam
+    - With read groups: _rg.bam
+    - Any .bam file
     
     Parameters:
     input_dir (str): Directory to search
     bam_type (str): Type of BAM files ('bwa', 'stampy', None for both)
-    suffix (str): File suffix to match
+    suffix (str or list): File suffix(es) to match. If None, tries common patterns.
     
     Returns:
     list: List of matching BAM files
@@ -67,17 +208,44 @@ def detect_bam_files(input_dir, bam_type=None, suffix="_filtered_merged_sorted.b
         logging.warning(f"Directory does not exist: {input_dir}")
         return []
     
+    # Define common BAM file suffixes in order of preference
+    if suffix is None:
+        suffixes = [
+            "_dedup.bam",                      # Deduplicated
+            "_marked_duplicates.bam",           # Marked duplicates
+            "_filtered_merged_sorted.bam",      # Filtered/merged
+            "_rg.bam",                          # With read groups
+            "_sorted.bam",                      # Sorted
+            ".bam"                              # Any BAM file
+        ]
+    elif isinstance(suffix, list):
+        suffixes = suffix
+    else:
+        suffixes = [suffix]
+    
     bam_files = []
-    for filename in os.listdir(input_dir):
-        # Check if file is a BAM file with the specified suffix
-        if filename.endswith(suffix):
-            # Filter by type if specified
-            if bam_type is None:
-                bam_files.append(filename)
-            elif bam_type == 'bwa' and 'bwa' in filename:
-                bam_files.append(filename)
-            elif bam_type == 'stampy' and 'stampy' in filename:
-                bam_files.append(filename)
+    all_files = set(os.listdir(input_dir))
+    
+    # Try each suffix in order
+    for suf in suffixes:
+        for filename in all_files:
+            # Check if file is a BAM file with the specified suffix
+            if filename.endswith(suf) and filename not in bam_files:
+                # Filter by type if specified
+                if bam_type is None:
+                    bam_files.append(filename)
+                elif bam_type == 'bwa' and 'bwa' in filename:
+                    bam_files.append(filename)
+                elif bam_type == 'stampy' and 'stampy' in filename:
+                    bam_files.append(filename)
+        
+        # If we found files with this suffix, stop searching
+        if bam_files:
+            logging.info(f"Found {len(bam_files)} BAM files with suffix '{suf}' in {input_dir}")
+            break
+    
+    if not bam_files:
+        logging.warning(f"No BAM files found in {input_dir} with any recognized suffix")
     
     return sorted(bam_files)
 
@@ -174,6 +342,26 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
             logging.warning(f"No BAM files found in {input_dir}")
             continue
         
+        # Validate BAM files
+        valid_bam_files = []
+        for bam_file in bam_files:
+            bam_path = os.path.join(input_dir, bam_file)
+            if validate_bam_file(bam_path):
+                # Check compatibility with reference
+                if check_reference_compatibility(reference_fasta, bam_path):
+                    valid_bam_files.append(bam_file)
+                else:
+                    logging.error(f"BAM file {bam_file} is incompatible with reference {reference_fasta}")
+            else:
+                logging.error(f"BAM file validation failed: {bam_file}")
+        
+        if not valid_bam_files:
+            logging.error(f"No valid BAM files found in {input_dir}")
+            continue
+        
+        bam_files = valid_bam_files
+        logging.info(f"Validated {len(bam_files)} BAM files in {input_dir}")
+        
         # Get paired BAM files if applicable
         paired_bam_files = []
         if is_paired:
@@ -182,7 +370,25 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
             if not paired_bam_files:
                 logging.warning(f"No BAM files found in paired directory {paired_input_dir}")
                 continue
-            logging.info(f"Found {len(paired_bam_files)} paired BAM files in {paired_input_dir}")
+            
+            # Validate paired BAM files
+            valid_paired_bam_files = []
+            for bam_file in paired_bam_files:
+                bam_path = os.path.join(paired_input_dir, bam_file)
+                if validate_bam_file(bam_path):
+                    if check_reference_compatibility(reference_fasta, bam_path):
+                        valid_paired_bam_files.append(bam_file)
+                    else:
+                        logging.error(f"Paired BAM file {bam_file} is incompatible with reference")
+                else:
+                    logging.error(f"Paired BAM file validation failed: {bam_file}")
+            
+            if not valid_paired_bam_files:
+                logging.error(f"No valid paired BAM files found in {paired_input_dir}")
+                continue
+            
+            paired_bam_files = valid_paired_bam_files
+            logging.info(f"Validated {len(paired_bam_files)} paired BAM files in {paired_input_dir}")
         
         # Process each region of interest
         for region in regions:
@@ -232,20 +438,15 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
                         bam_path = os.path.join(input_dir, bam_files[0])
                         paired_bam_path = os.path.join(paired_input_dirs[i], paired_bam_files[0])
                         
-                        # Extract common sample name using regex instead of hard-coded replacement
-                        sample_name = bam_files[0].replace("_filtered_merged_sorted.bam", "")
-                        sample_name = re.sub(r'(\d{2,4})([A-Z])', r'\1', sample_name)  # E.g., "12A" -> "12"
+                        # Extract sample name (preserve library IDs like "2007A")
+                        sample_names = extract_sample_names_from_bams([bam_files[0]])
+                        sample_name = sample_names[0] if sample_names else "sample"
                         
                         output_vcf = f"{sample_name}_{interval.replace(':', '_')}_bcftools_variants.vcf"
                         output_path = os.path.join(output_dir, output_vcf)
                         
-                        # Create a temporary samples file for bcftools to recognize individual samples
-                        samples_file = os.path.join(job_dir, f"samples_{sample_name}_{i}.txt")
-                        with open(samples_file, "w") as sf:
-                            sf.write(f"{bam_path}\t{sample_name}\n")
-                            sf.write(f"{paired_bam_path}\t{sample_name}_paired\n")
-
-                        # Construct command with mpileup | call pipeline and samples file
+                        # Construct command with mpileup | call pipeline
+                        # Note: bcftools will use read group sample names from BAM files
                         call_cmd = (f"{caller_path} mpileup --threads={threads} {caller_params} "
                                 f"-r {interval} -f {reference_fasta} {bam_path} {paired_bam_path} | "
                                 f"{caller_path} call -mv -Ov --threads={threads} -o {output_path}")
@@ -253,22 +454,15 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
                         # Standard case (single directory or multiple samples)
                         bam_paths = ' '.join([os.path.join(input_dir, f) for f in bam_files])
                         all_bam_files = bam_files.copy()
-                        all_bam_paths = [os.path.join(input_dir, f) for f in bam_files]
                         
                         if is_paired:
                             # Add paired BAM files
                             paired_bam_paths = ' '.join([os.path.join(paired_input_dirs[i], f) for f in paired_bam_files])
                             bam_paths = f"{bam_paths} {paired_bam_paths}"
                             all_bam_files.extend(paired_bam_files)
-                            all_bam_paths.extend([os.path.join(paired_input_dirs[i], f) for f in paired_bam_files])
                         
-                        # Create a temporary samples file for bcftools to recognize individual samples
-                        samples_file = os.path.join(job_dir, f"samples_{i}_{interval.replace(':', '_')}.txt")
-                        with open(samples_file, "w") as sf:
-                            sample_names = extract_sample_names_from_bams(all_bam_files)
-                            for path, sample in zip(all_bam_paths, sample_names):
-                                sf.write(f"{path}\t{sample}\n")
-
+                        # Construct command with mpileup | call pipeline
+                        # bcftools will automatically use read group sample names from BAM @RG headers
                         call_cmd = (f"{caller_path} mpileup --threads={threads} {caller_params} "
                                     f"-r {interval} -f {reference_fasta} {bam_paths} | "
                                     f"{caller_path} call -mv -Ov --threads={threads} -o {output_path}")
@@ -281,7 +475,12 @@ def generate_variant_calling_jobs(input_dirs, output_dirs, job_dirs,
                         paired_gatk_inputs = ' '.join([f"-I {os.path.join(paired_input_dirs[i], f)}" for f in paired_bam_files])
                         gatk_inputs = f"{gatk_inputs} {paired_gatk_inputs}"
                     
-                    call_cmd = f"{caller_path} {caller_params} -R {reference_fasta} {gatk_inputs} -L {interval} -O {output_path}"
+                    # Calculate Java heap memory (80% of SLURM allocation, minimum 8GB)
+                    mem_value = float(mem_per_cpu.rstrip('gGmM'))
+                    total_mem_gb = mem_value * threads
+                    java_mem_gb = max(8, int(total_mem_gb * 0.8))
+                    
+                    call_cmd = f"{caller_path} --java-options '-Xmx{java_mem_gb}g' {caller_params} -R {reference_fasta} {gatk_inputs} -L {interval} -O {output_path}"
                 else:
                     logging.error(f"Unsupported variant caller: {variant_caller}")
                     continue
@@ -397,6 +596,18 @@ def merge_vcf_files_jobs_generator(input_dirs, output_dirs, job_dirs,
         if not vcf_files:
             logging.warning(f"No VCF files found in {input_dir}")
             continue
+        
+        # Validate VCF files
+        valid_vcf_files, invalid_vcf_files = validate_vcf_files(vcf_files)
+        if not valid_vcf_files:
+            logging.error(f"No valid VCF files found in {input_dir}")
+            continue
+        
+        if invalid_vcf_files:
+            logging.warning(f"Skipping {len(invalid_vcf_files)} invalid VCF files in {input_dir}")
+        
+        vcf_files = valid_vcf_files
+        logging.info(f"Validated {len(vcf_files)} VCF files in {input_dir}")
         
         if merge_mode == 'global':
             # GLOBAL MODE: Merge all files into one output file

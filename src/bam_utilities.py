@@ -411,7 +411,7 @@ def generate_add_readgroups_jobs(input_dirs, job_dirs, read_group_libs=None,
         except Exception as e:
             logging.error(f"Error processing directory {input_dir}: {e}")
 
-def generate_indexing_jobs(input_dirs, job_dirs, samtools_path="samtools", picard_path="picard",
+def generate_indexing_jobs(input_dirs, job_dirs, samtools_path="samtools",
                             partition="sixhour", time="16:00:00", 
                             email="l338m483@ku.edu", mem_per_cpu="5g", cpus=10):
     """
@@ -421,7 +421,6 @@ def generate_indexing_jobs(input_dirs, job_dirs, samtools_path="samtools", picar
     input_dirs (list): List of directories containing BAM files to index
     job_dirs (list): List of directories for job scripts
     samtools_path (str): Path to samtools executable
-    picard_path (str): Path to picard executable
     partition (str): SLURM partition to use
     time (str): Time limit for jobs
     email (str): Email for notifications

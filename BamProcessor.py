@@ -259,8 +259,9 @@ def main():
             sys.exit(1)
         
         generate_indexing_jobs(args.input_dirs, args.job_dirs,
-                                samtools_path=args.samtools_path, picard_path=args.picard_path,
-                                partition=args.partition, time=args.time, email=args.email,
+                                samtools_path=args.samtools_path,
+                                partition=args.partition, time=args.time, 
+                                email=args.email,
                                 mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
         
         if args.submit:

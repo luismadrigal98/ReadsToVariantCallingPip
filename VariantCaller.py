@@ -171,6 +171,8 @@ def main():
     global_parser.add_argument("--samtools-path", type=str,
                              default="/kuhpc/sw/conda/latest/envs/bioconda/bin/samtools",
                              help="Path to samtools executable")
+    global_parser.add_argument("--bam-suffix", type=str, default="_filtered_merged_sorted.bam",
+                             help="BAM file suffix to select (e.g., '_filtered_merged_sorted.bam' or '_processed_merged_sorted.bam')")
     
     # Merge command
     merge_parser = subparsers.add_parser("merge", parents=[common_parser],
@@ -351,7 +353,8 @@ def main():
             caller_params=args.caller_params,
             threads=args.threads,
             constraint=args.constraint,
-            output_prefix=args.output_prefix
+            output_prefix=args.output_prefix,
+            bam_suffix=args.bam_suffix
         )
         
         if args.submit and jobs:

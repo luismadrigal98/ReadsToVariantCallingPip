@@ -439,19 +439,19 @@ def generate_indexing_jobs(input_dirs, job_dirs, samtools_path="samtools",
                 continue
             
             for bam_file in bam_files:
-                # Extract sample name for job naming
-                sample_name = re.sub(r'_.*$', '', bam_file)
+                # Create unique job name from the BAM filename (without .bam extension)
+                job_base_name = bam_file.replace('.bam', '')
                 
                 # Create indexing command (no read group modification needed here)
                 index_command = f"{samtools_path} index -b {os.path.join(input_dir, bam_file)}"
                 
-                # Create job script
-                job_script_path = os.path.join(job_dir, f"indexing_{sample_name}_job.sh")
+                # Create job script with unique name based on full BAM filename
+                job_script_path = os.path.join(job_dir, f"indexing_{job_base_name}_job.sh")
                 
                 with open(job_script_path, "w") as script:
                     script.write("#!/bin/bash\n")
-                    script.write(f"#SBATCH --job-name=index_{sample_name}_job\n")
-                    script.write(f"#SBATCH --output={os.path.join(job_dir, f'index_{sample_name}_output')}\n")
+                    script.write(f"#SBATCH --job-name=index_{job_base_name}_job\n")
+                    script.write(f"#SBATCH --output={os.path.join(job_dir, f'index_{job_base_name}_output')}\n")
                     script.write(f"#SBATCH --partition={partition}\n")
                     script.write("#SBATCH --nodes=1\n")
                     script.write("#SBATCH --ntasks=1\n")

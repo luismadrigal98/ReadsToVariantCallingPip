@@ -527,7 +527,7 @@ def generate_global_variant_calling_jobs(input_dirs, output_dir, job_dir,
                                         caller_path=None, partition="sixhour", time="6:00:00",
                                         email="l338m483@ku.edu", mem_per_cpu="30g",
                                         caller_params=None, threads=1, constraint=None,
-                                        output_prefix="global_variants"):
+                                        output_prefix="global_variants", bam_suffix="_filtered_merged_sorted.bam"):
     """
     Generate SLURM jobs for GLOBAL variant calling - all BAM files from all directories called together.
     
@@ -551,6 +551,7 @@ def generate_global_variant_calling_jobs(input_dirs, output_dir, job_dir,
     threads (int): Number of threads to use
     constraint (str): SLURM node constraints
     output_prefix (str): Prefix for output VCF files
+    bam_suffix (str): BAM file suffix to select (e.g., '_filtered_merged_sorted.bam')
     
     Returns:
     list: List of generated job script paths
@@ -594,6 +595,7 @@ def generate_global_variant_calling_jobs(input_dirs, output_dir, job_dir,
     all_bam_paths = []
     
     logging.info(f"Collecting BAM files from {len(input_dirs)} directories for global variant calling")
+    logging.info(f"Filtering for BAM files ending with: {bam_suffix}")
     
     for input_dir in input_dirs:
         bam_files = detect_bam_files(input_dir)
@@ -601,8 +603,17 @@ def generate_global_variant_calling_jobs(input_dirs, output_dir, job_dir,
             logging.warning(f"No BAM files found in {input_dir}")
             continue
         
+        # Filter BAM files by suffix
+        filtered_bam_files = [f for f in bam_files if f.endswith(bam_suffix)]
+        
+        if not filtered_bam_files:
+            logging.warning(f"No BAM files with suffix '{bam_suffix}' found in {input_dir}")
+            continue
+        
+        logging.info(f"Found {len(filtered_bam_files)} BAM files with suffix '{bam_suffix}' in {input_dir}")
+        
         # Validate BAM files
-        for bam_file in bam_files:
+        for bam_file in filtered_bam_files:
             bam_path = os.path.join(input_dir, bam_file)
             if validate_bam_file(bam_path):
                 # Check compatibility with reference

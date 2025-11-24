@@ -831,7 +831,7 @@ def merge_vcf_files_jobs_generator(input_dirs, output_dirs, job_dirs,
                 script.write(f"#SBATCH --job-name=merge_{sample_name}_all_job\n")
                 script.write(f"#SBATCH --output={os.path.join(job_dir, 'merge_all_output')}\n")
                 script.write(f"#SBATCH --partition={partition}\n")
-                if constraint:
+                if constraint or constraint is not None:
                     script.write(f"#SBATCH --constraint={constraint}\n")
                 script.write("#SBATCH --nodes=1\n")
                 script.write("#SBATCH --ntasks=1\n")

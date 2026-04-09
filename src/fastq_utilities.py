@@ -143,6 +143,9 @@ def generate_split_jobs(input_dirs, output_dirs, job_dirs, lines=4000000, partit
     """
     
     for i, (input_dir, output_dir, job_dir) in enumerate(zip(input_dirs, output_dirs, job_dirs)):
+        input_dir = os.path.abspath(input_dir)
+        output_dir = os.path.abspath(output_dir)
+        job_dir = os.path.abspath(job_dir)
         # Create directories if they don't exist
         create_directory(output_dir)
         create_directory(job_dir)
@@ -177,7 +180,7 @@ def generate_split_jobs(input_dirs, output_dirs, job_dirs, lines=4000000, partit
                     script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
                     script.write("\n")
                     script.write(f"cd {input_dir}\n")
-                    script.write(f"zcat {file} | split -l {lines} - {os.path.abspath(output_dir)}/{name}\n")
+                    script.write(f"zcat {file} | split -l {lines} - {output_dir}/{name}\n")
                 
                 os.chmod(job_script_path, 0o755)
                 logging.info(f"Created split job script: {job_script_path}")
@@ -204,6 +207,8 @@ def generate_compress_jobs(batch_dirs, job_dirs, partition="sixhour",
     """
     
     for batch_dir, job_dir in zip(batch_dirs, job_dirs):
+        batch_dir = os.path.abspath(batch_dir)
+        job_dir = os.path.abspath(job_dir)
         # Create job directory if it doesn't exist
         create_directory(job_dir)
         
@@ -273,6 +278,9 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="fastp",
     """
     
     for batch_dir, output_dir, job_dir in zip(batch_dirs, output_dirs, job_dirs):
+        batch_dir = os.path.abspath(batch_dir)
+        output_dir = os.path.abspath(output_dir)
+        job_dir = os.path.abspath(job_dir)
         # Create directories if they don't exist
         create_directory(output_dir)
         create_directory(job_dir)
@@ -405,9 +413,6 @@ def generate_fastp_jobs(batch_dirs, output_dirs, job_dirs, fastp_path="fastp",
                     script.write("# Run fastp\n")
                     script.write(fastp_command)
                     script.write("\n")
-                    script.write(f"cd {batch_dir}\n")
-                    script.write("\n")
-                    script.write(fastp_command)
                 
                 os.chmod(job_script_path, 0o755)
                 logging.info(f"Created single-end fastp job script: {job_script_path}")

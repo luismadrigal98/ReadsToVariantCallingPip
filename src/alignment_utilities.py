@@ -105,10 +105,13 @@ def generate_bwa_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
     cpus (int): Number of CPUs per task
     """
     for input_dir, output_dir, job_dir in zip(input_dirs, output_dirs, job_dirs):
+        input_dir = os.path.abspath(input_dir)
+        output_dir = os.path.abspath(output_dir)
+        job_dir = os.path.abspath(job_dir)
         # Create directories if they don't exist
         create_directory(output_dir)
         create_directory(job_dir)
-        
+
         try:
             # Detect file types in the directory
             file_types = detect_preprocessed_files(input_dir)
@@ -215,10 +218,13 @@ def generate_sam_to_bam_jobs(input_dirs, output_dirs, job_dirs,
     cpus (int): Number of CPUs per task
     """
     for input_dir, output_dir, job_dir in zip(input_dirs, output_dirs, job_dirs):
+        input_dir = os.path.abspath(input_dir)
+        output_dir = os.path.abspath(output_dir)
+        job_dir = os.path.abspath(job_dir)
         # Create directories if they don't exist
         create_directory(output_dir)
         create_directory(job_dir)
-        
+
         try:
             # Find all compressed SAM files
             sam_files = [f for f in os.listdir(input_dir) if f.endswith('_bwa-aligned.sam.gz')]
@@ -319,10 +325,13 @@ def generate_stampy_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
     cpus (int): Number of CPUs per task (note: Stampy may not use all cores effectively)
     """
     for input_dir, output_dir, job_dir in zip(input_dirs, output_dirs, job_dirs):
+        input_dir = os.path.abspath(input_dir)
+        output_dir = os.path.abspath(output_dir)
+        job_dir = os.path.abspath(job_dir)
         # Create directories if they don't exist
         create_directory(output_dir)
         create_directory(job_dir)
-        
+
         try:
             # Get all sorted BAM files
             bam_files = detect_bam_files(input_dir)

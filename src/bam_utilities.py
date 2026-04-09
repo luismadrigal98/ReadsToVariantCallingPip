@@ -63,10 +63,13 @@ def generate_merge_jobs(input_dirs, output_dirs, job_dirs,
     cpus (int): Number of CPUs per task
     """
     for input_dir, output_dir, job_dir in zip(input_dirs, output_dirs, job_dirs):
+        input_dir = os.path.abspath(input_dir)
+        output_dir = os.path.abspath(output_dir)
+        job_dir = os.path.abspath(job_dir)
         # Create directories if they don't exist
         create_directory(output_dir)
         create_directory(job_dir)
-        
+
         try:
             # Get all BAM files
             all_bam_files = detect_bam_files(input_dir, bam_type)
@@ -240,6 +243,9 @@ def generate_duplicate_processing_jobs(input_dirs, output_dirs_base, job_dirs,
     config = mode_configs[duplicate_mode]
     
     for input_dir, output_dir_base, job_dir in zip(input_dirs, output_dirs_base, job_dirs):
+        input_dir = os.path.abspath(input_dir)
+        output_dir_base = os.path.abspath(output_dir_base)
+        job_dir = os.path.abspath(job_dir)
         create_directory(job_dir)
         
         try:
@@ -339,6 +345,8 @@ def generate_add_readgroups_jobs(input_dirs, job_dirs, read_group_libs=None,
         raise ValueError(f"Length of read_group_libs ({len(read_group_libs)}) must match length of input_dirs ({len(input_dirs)})")
     
     for idx, (input_dir, job_dir) in enumerate(zip(input_dirs, job_dirs)):
+        input_dir = os.path.abspath(input_dir)
+        job_dir = os.path.abspath(job_dir)
         create_directory(job_dir)
         
         try:
@@ -428,8 +436,10 @@ def generate_indexing_jobs(input_dirs, job_dirs, samtools_path="samtools",
     cpus (int): Number of CPUs per task
     """
     for input_dir, job_dir in zip(input_dirs, job_dirs):
+        input_dir = os.path.abspath(input_dir)
+        job_dir = os.path.abspath(job_dir)
         create_directory(job_dir)
-        
+
         try:
             # Find BAM files to index
             bam_files = [f for f in os.listdir(input_dir) if f.endswith('.bam')]

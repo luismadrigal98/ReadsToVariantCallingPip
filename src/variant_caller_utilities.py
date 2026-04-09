@@ -756,7 +756,8 @@ def merge_vcf_files_jobs_generator(input_dirs, output_dirs, job_dirs,
                                   partition="sixhour", time="6:00:00",
                                   email="l338m483@ku.edu", mem_per_cpu="30g",
                                   threads=1, merge_command='concat',
-                                  sample_names=None, merge_mode='by_chromosome'):
+                                  sample_names=None, merge_mode='by_chromosome',
+                                  constraint=None):
     """
     Generate jobs to merge VCF files globally or by chromosome.
     

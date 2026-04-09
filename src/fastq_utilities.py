@@ -177,7 +177,7 @@ def generate_split_jobs(input_dirs, output_dirs, job_dirs, lines=4000000, partit
                     script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
                     script.write("\n")
                     script.write(f"cd {input_dir}\n")
-                    script.write(f"zcat {file} | split -l {lines} - {output_dir}/{name}\n")
+                    script.write(f"zcat {file} | split -l {lines} - {os.path.abspath(output_dir)}/{name}\n")
                 
                 os.chmod(job_script_path, 0o755)
                 logging.info(f"Created split job script: {job_script_path}")

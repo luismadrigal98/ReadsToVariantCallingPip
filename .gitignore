@@ -1,2 +1,5 @@
 src/__pycache__/fastq_utilities.cpython-310.pyc
 To_do.txt
+.claude/settings.json
+src/__pycache__/__init__.cpython-312.pyc
+src/__pycache__/fastq_utilities.cpython-312.pyc

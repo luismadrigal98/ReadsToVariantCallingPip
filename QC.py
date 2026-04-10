@@ -138,7 +138,15 @@ def main():
                                help="Maximum number of retry attempts for failed jobs")
     compress_parser.add_argument("--abort-on-failure", action="store_true",
                             help="Abort if jobs fail after retries")
-    
+    compress_parser.add_argument("--compressor", type=str, default="pigz",
+                            choices=["pigz", "gzip"],
+                            help="Compression tool to use (default: pigz for parallel compression)")
+
+    # Status command
+    status_parser = subparsers.add_parser("status", help="Check compression status of split directories")
+    status_parser.add_argument("--split-dirs", type=str, nargs="+", required=True,
+                            help="Split directories to inspect")
+
     # Fastp command
     fastp_parser = subparsers.add_parser("fastp", parents=[common_parser], help="Run fastp on FASTQ files")
     fastp_parser.add_argument("--batch-dirs", type=str, nargs="+", required=True,
@@ -211,6 +219,9 @@ def main():
                             help="Maximum number of retry attempts for failed jobs")
     workflow_parser.add_argument("--abort-on-failure", action="store_true",
                             help="Abort workflow if jobs fail after retries")
+    workflow_parser.add_argument("--compressor", type=str, default="pigz",
+                            choices=["pigz", "gzip"],
+                            help="Compression tool to use (default: pigz for parallel compression)")
 
     # Parse arguments
     args = parser.parse_args()
@@ -259,7 +270,7 @@ def main():
             sys.exit(1)
         generate_compress_jobs(args.batch_dirs, args.job_dirs, partition=args.partition,
                             time=args.time, email=args.email, mem_per_cpu=args.mem_per_cpu,
-                            cpus=args.cpus)
+                            cpus=args.cpus, compressor=args.compressor)
         
         if args.submit:
             # Submit compression jobs with retry capability
@@ -380,7 +391,7 @@ def main():
         logging.info("\n=== STEP 2: Generating compression jobs ===")
         generate_compress_jobs(args.split_dirs, args.job_dirs, partition=args.partition,
                             time=args.time, email=args.email, mem_per_cpu=args.mem_per_cpu,
-                            cpus=args.cpus)
+                            cpus=args.cpus, compressor=args.compressor)
         
         if args.submit:
             # Submit compression jobs from all directories with retry capability
@@ -461,6 +472,22 @@ def main():
             logging.info("1. Run split jobs")
             logging.info("2. Run compression jobs")
             logging.info("3. Run fastp jobs")
+
+    elif args.command == "status":
+        logging.info("=== Compression status ===")
+        result = check_compression_status(args.split_dirs)
+        overall = result['overall']
+        total = overall['compressed'] + overall['partial'] + overall['pending']
+        if total == 0:
+            logging.info("No split files found in any of the specified directories.")
+        else:
+            logging.info(f"Total files: {total}")
+            logging.info(f"  Compressed (done)  : {overall['compressed']} ({overall['compressed']/total*100:.1f}%)")
+            logging.info(f"  Partial (needs redo): {overall['partial']} ({overall['partial']/total*100:.1f}%)")
+            logging.info(f"  Pending (not started): {overall['pending']} ({overall['pending']/total*100:.1f}%)")
+        if overall['partial'] > 0 or overall['pending'] > 0:
+            logging.info("\nTo resume compression, regenerate compress jobs and resubmit:")
+            logging.info("  QC_fast_wr compress --batch-dirs <split-dirs> --job-dirs <job-dirs> --submit")
 
     else:
         parser.print_help()

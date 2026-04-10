@@ -8,6 +8,7 @@ Utilities for working with fastq files.
 import os
 import re
 import logging
+import subprocess
 
 def extract_sample_id(filename, method="auto"):
     """
@@ -190,41 +191,114 @@ def generate_split_jobs(input_dirs, output_dirs, job_dirs, lines=4000000, partit
         except Exception as e:
             logging.error(f"An error occurred: {e}")
 
-def generate_compress_jobs(batch_dirs, job_dirs, partition="sixhour", 
-                        time="6:00:00", email="l338m483@ku.edu", 
-                        mem_per_cpu="5g", cpus=10, constraint=None):
+def check_compression_status(batch_dirs):
+    """
+    Scan batch directories and classify each split file by compression state.
+
+    States:
+    - compressed : only the .gz exists (original removed after successful compression)
+    - partial    : both the original and a .gz exist (interrupted mid-run)
+    - pending    : only the original exists, not yet compressed
+
+    Parameters:
+    batch_dirs (list): Directories to inspect
+
+    Returns:
+    dict: {
+        'per_dir': {abs_path: {'compressed': [...], 'partial': [...], 'pending': [...]}},
+        'overall': {'compressed': int, 'partial': int, 'pending': int}
+    }
+    """
+    overall = {'compressed': 0, 'partial': 0, 'pending': 0}
+    per_dir = {}
+
+    for batch_dir in batch_dirs:
+        batch_dir = os.path.abspath(batch_dir)
+        status = {'compressed': [], 'partial': [], 'pending': []}
+
+        if not os.path.exists(batch_dir):
+            logging.warning(f"Directory does not exist: {batch_dir}")
+            per_dir[batch_dir] = status
+            continue
+
+        filenames   = set(os.listdir(batch_dir))
+        uncompressed = {f for f in filenames if not f.endswith('.gz')}
+        gz_bases     = {f[:-3] for f in filenames if f.endswith('.gz')}
+
+        for f in sorted(uncompressed):
+            if f in gz_bases:
+                status['partial'].append(f)   # original + .gz coexist → interrupted
+            else:
+                status['pending'].append(f)   # no .gz yet
+
+        for gz_base in sorted(gz_bases):
+            if gz_base not in uncompressed:
+                status['compressed'].append(gz_base)   # only .gz, original gone
+
+        per_dir[batch_dir] = status
+        overall['compressed'] += len(status['compressed'])
+        overall['partial']    += len(status['partial'])
+        overall['pending']    += len(status['pending'])
+
+        logging.info(
+            f"{batch_dir}: {len(status['compressed'])} compressed, "
+            f"{len(status['partial'])} partial, {len(status['pending'])} pending"
+        )
+
+    logging.info(
+        f"Overall — compressed: {overall['compressed']}, "
+        f"partial: {overall['partial']}, pending: {overall['pending']}"
+    )
+    return {'per_dir': per_dir, 'overall': overall}
+
+
+def generate_compress_jobs(batch_dirs, job_dirs, partition="sixhour",
+                           time="6:00:00", email=None,
+                           mem_per_cpu="5g", cpus=10, constraint=None,
+                           compressor="pigz"):
     """
     Generate SLURM job scripts to compress split FASTQ files.
-    
+
+    The generated scripts are idempotent:
+    - Files already fully compressed (only .gz present) are skipped.
+    - Partial .gz files left by a previous interrupted run are deleted and
+      the original file is recompressed.
+
     Parameters:
-    batch_dirs (list): List of directories containing split files
-    job_dirs (list): List of directories for job scripts
-    partition (str): SLURM partition to use
-    time (str): Time limit for jobs
-    email (str): Email for notifications
+    batch_dirs (list): Directories containing split files
+    job_dirs (list): Directories for job scripts
+    partition (str): SLURM partition
+    time (str): Wall-clock time limit
+    email (str): Email for FAIL notifications (None = no email)
     mem_per_cpu (str): Memory per CPU
-    cpus (int): Number of CPUs per task
+    cpus (int): CPUs per task (used for pigz parallelism)
+    constraint (str): SLURM node constraint
+    compressor (str): 'pigz' (parallel, default) or 'gzip'
     """
-    
+
     for batch_dir, job_dir in zip(batch_dirs, job_dirs):
         batch_dir = os.path.abspath(batch_dir)
-        job_dir = os.path.abspath(job_dir)
-        # Create job directory if it doesn't exist
+        job_dir   = os.path.abspath(job_dir)
         create_directory(job_dir)
-        
+
         try:
             filenames = os.listdir(batch_dir)
 
             if not filenames:
                 logging.warning(f"No files found in {batch_dir} - this is expected when not using --submit")
-            
-            # Get unique filename roots by stripping the trailing split suffix (aa, ab, aaa, etc.)
-            filenames_shortened = [re.sub(r'[a-z]+$', '', name) for name in filenames if name]
-            unique_filenames = list(set(filenames_shortened))
-            
-            for locator in unique_filenames:
+
+            # Derive unique prefixes from uncompressed files only
+            uncompressed = [f for f in filenames if not f.endswith('.gz')]
+            locators = list(set(re.sub(r'[a-z]+$', '', f) for f in uncompressed if f))
+
+            for locator in locators:
                 job_script_path = os.path.join(job_dir, f"gzip_in_batch_{locator}_compress_job.sh")
-                
+
+                if compressor == "pigz":
+                    compress_cmd = f"pigz -p {cpus} \"$f\""
+                else:
+                    compress_cmd = "gzip \"$f\""
+
                 with open(job_script_path, "w") as script:
                     script.write("#!/bin/bash\n")
                     script.write(f"#SBATCH --job-name=gzip_in_batch_{locator}_job\n")
@@ -236,18 +310,34 @@ def generate_compress_jobs(batch_dirs, job_dirs, partition="sixhour",
                     script.write("#SBATCH --ntasks=1\n")
                     script.write(f"#SBATCH --cpus-per-task={cpus}\n")
                     script.write(f"#SBATCH --time={time}\n")
-                    if email:  # Only add email notifications if email is provided
+                    if email:
                         script.write(f"#SBATCH --mail-user={email}\n")
                         script.write("#SBATCH --mail-type=FAIL\n")
                     script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
                     script.write("\n")
-                    script.write(f"cd {batch_dir}\n")
+                    script.write("set -uo pipefail\n")
                     script.write("\n")
-                    script.write(f"gzip {locator}*\n")
-                
+                    script.write(f"for f in {batch_dir}/{locator}*; do\n")
+                    script.write( "    [ -e \"$f\" ] || continue\n")          # guard: glob matched nothing
+                    script.write( "    [[ \"$f\" == *.gz ]] && continue\n")   # skip already-compressed files
+                    script.write( "    gz=\"${f}.gz\"\n")
+                    script.write( "    if [ -f \"$gz\" ]; then\n")
+                    script.write( "        if gzip -t \"$gz\" 2>/dev/null; then\n")
+                    script.write( "            echo \"Already valid: $f — skipping\"\n")
+                    script.write( "            continue\n")
+                    script.write( "        else\n")
+                    script.write( "            echo \"Removing corrupt/partial: $gz\"\n")
+                    script.write( "            rm -f \"$gz\"\n")
+                    script.write( "        fi\n")
+                    script.write( "    fi\n")
+                    script.write( "    echo \"Compressing: $f\"\n")
+                    script.write(f"    {compress_cmd}\n")
+                    script.write( "done\n")
+                    script.write(f"echo 'Compression complete for {locator}'\n")
+
                 os.chmod(job_script_path, 0o755)
                 logging.info(f"Created compression job script: {job_script_path}")
-        
+
         except FileNotFoundError:
             logging.error(f"Directory not found: {batch_dir}")
         except Exception as e:

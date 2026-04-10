@@ -32,7 +32,7 @@ def extract_sample_id(filename, method="auto"):
     
     if method == "auto":
         # Try to detect if this looks like split files and use appropriate method
-        if re.search(r'_[a-z]{2}$', base_name):  # Ends with _XX (like _gb, _fu, etc.)
+        if re.search(r'_[a-z]+$', base_name):  # Ends with split suffix (aa, abc, aaaa, etc.)
             return base_name  # Use full name for split files
         else:
             # For non-split files, use prefix method

@@ -93,6 +93,8 @@ def main():
                             help="Maximum number of retry attempts for failed jobs")
     common_parser.add_argument("--abort-on-failure", action="store_true",
                             help="Abort workflow if jobs fail after retries")
+    common_parser.add_argument("--resume", action="store_true",
+                            help="Skip jobs whose output files already exist and are non-empty")
     
     # Subparsers for different commands
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
@@ -200,10 +202,11 @@ def main():
             logging.error("Error: Number of input, output, and job directories must match")
             sys.exit(1)
         
-        generate_bwa_jobs(args.input_dirs, args.output_dirs, args.job_dirs, 
+        generate_bwa_jobs(args.input_dirs, args.output_dirs, args.job_dirs,
                         args.reference, bwa_path=args.bwa_path,
                         partition=args.partition, time=args.time, email=args.email,
-                        mem_per_cpu=args.mem_per_cpu, cpus=args.cpus, constraint=args.constraint)
+                        mem_per_cpu=args.mem_per_cpu, cpus=args.cpus, constraint=args.constraint,
+                        skip_existing=args.resume)
         
         if args.submit:
             # Find and submit all BWA jobs from all directories with retry capability
@@ -242,7 +245,8 @@ def main():
         generate_sam_to_bam_jobs(args.input_dirs, args.output_dirs, args.job_dirs,
                                 samtools_path=args.samtools_path,
                                 partition=args.partition, time=args.time, email=args.email,
-                                mem_per_cpu=args.mem_per_cpu, cpus=args.cpus, constraint=args.constraint)
+                                mem_per_cpu=args.mem_per_cpu, cpus=args.cpus, constraint=args.constraint,
+                                skip_existing=args.resume)
         
         if args.submit:
             # Find and submit all SAM to BAM jobs from all directories with retry capability
@@ -282,7 +286,8 @@ def main():
                     args.reference, args.python_2_7_path, args.stampy_path,
                     args.samtools_path,
                     partition=args.partition, time=args.time, email=args.email,
-                    mem_per_cpu=args.mem_per_cpu, cpus=args.stampy_cpus, constraint=args.constraint)
+                    mem_per_cpu=args.mem_per_cpu, cpus=args.stampy_cpus, constraint=args.constraint,
+                    skip_existing=args.resume)
         
         if args.submit:
             # Find and submit all Stampy jobs from all directories with retry capability
@@ -324,10 +329,11 @@ def main():
         
         # STEP 1: BWA alignment
         logging.info("=== STEP 1: Generating BWA alignment jobs ===")
-        generate_bwa_jobs(args.input_dirs, args.bwa_dirs, args.job_dirs, 
+        generate_bwa_jobs(args.input_dirs, args.bwa_dirs, args.job_dirs,
                         args.reference, bwa_path=args.bwa_path,
                         partition=args.partition, time=args.time, email=args.email,
-                        mem_per_cpu=args.mem_per_cpu, cpus=args.cpus, constraint=args.constraint)
+                        mem_per_cpu=args.mem_per_cpu, cpus=args.cpus, constraint=args.constraint,
+                        skip_existing=args.resume)
         
         if args.submit:
             # Submit all BWA jobs from all directories with retry capability
@@ -364,7 +370,8 @@ def main():
         generate_sam_to_bam_jobs(args.bwa_dirs, args.bam_dirs, args.job_dirs,
                                 samtools_path=args.samtools_path,
                                 partition=args.partition, time=args.time, email=args.email,
-                                mem_per_cpu=args.mem_per_cpu, cpus=args.cpus, constraint=args.constraint)
+                                mem_per_cpu=args.mem_per_cpu, cpus=args.cpus, constraint=args.constraint,
+                                skip_existing=args.resume)
         
         if args.submit:
             # Submit all SAM to BAM jobs from all directories with retry capability
@@ -402,7 +409,8 @@ def main():
                         args.reference, args.python_2_7_path, args.stampy_path,
                         args.samtools_path,
                         partition=args.partition, time=args.time, email=args.email,
-                        mem_per_cpu=args.mem_per_cpu, cpus=args.stampy_cpus, constraint=args.constraint)
+                        mem_per_cpu=args.mem_per_cpu, cpus=args.stampy_cpus, constraint=args.constraint,
+                        skip_existing=args.resume)
         
         if args.submit:
             # Submit all Stampy jobs from all directories with retry capability

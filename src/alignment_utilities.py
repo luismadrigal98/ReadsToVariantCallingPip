@@ -86,9 +86,10 @@ def detect_bam_files(input_dir):
     return bam_files
 
 def generate_bwa_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
-                    bwa_path="/kuhpc/sw/conda/latest/envs/bioconda/bin/bwa", 
-                    partition="sixhour", time="6:00:00", 
-                    email="l338m483@ku.edu", mem_per_cpu="5g", cpus=10, constraint=None):
+                    bwa_path="/kuhpc/sw/conda/latest/envs/bioconda/bin/bwa",
+                    partition="sixhour", time="6:00:00",
+                    email="l338m483@ku.edu", mem_per_cpu="5g", cpus=10, constraint=None,
+                    skip_existing=False):
     """
     Generate SLURM job scripts to run BWA on preprocessed FASTQ files.
     
@@ -122,10 +123,16 @@ def generate_bwa_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
                 # Keep chunk suffixes for unique processing: handles any number of letters (aa, abc, aaaa, etc.)
                 # JKK-98A_S1_L001_SET3_R1_001_aa_preprocessed.fastq.gz -> JKK-98A_S1_L001_SET3_001_aa
                 sample_name = re.sub(r'_R1_001_([a-z]+)_preprocessed\.fastq\.gz', r'_001_\1', r1_file)
-                
+
                 # Output file name
                 out_sam = f"{sample_name}_bwa-aligned.sam.gz"
-                
+
+                if skip_existing:
+                    out_path = os.path.join(output_dir, out_sam)
+                    if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+                        logging.info(f"Skipping BWA (already done): {out_sam}")
+                        continue
+
                 # BWA command for paired-end reads
                 bwa_command = (f"{bwa_path} mem -t {cpus} {reference_genome} "
                                 f"{os.path.join(input_dir, r1_file)} "
@@ -161,10 +168,16 @@ def generate_bwa_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
                 # Extract a meaningful name for the job and output
                 # Keep chunk suffixes for unique processing: handles any number of letters
                 sample_name = re.sub(r'_([a-z]+)_preprocessed\.fastq\.gz', r'_\1', single_file)
-                
+
                 # Output file name
                 out_sam = f"{sample_name}_bwa-aligned.sam.gz"
-                
+
+                if skip_existing:
+                    out_path = os.path.join(output_dir, out_sam)
+                    if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+                        logging.info(f"Skipping BWA (already done): {out_sam}")
+                        continue
+
                 # BWA command for single-end reads
                 bwa_command = (f"{bwa_path} mem -t {cpus} {reference_genome} "
                                 f"{os.path.join(input_dir, single_file)} | "
@@ -199,10 +212,11 @@ def generate_bwa_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
         except Exception as e:
             logging.error(f"An error occurred: {e}")
 
-def generate_sam_to_bam_jobs(input_dirs, output_dirs, job_dirs, 
-                            samtools_path="samtools", partition="sixhour", 
-                            time="6:00:00", email="l338m483@ku.edu", 
-                            mem_per_cpu="5g", cpus=4, constraint=None):
+def generate_sam_to_bam_jobs(input_dirs, output_dirs, job_dirs,
+                            samtools_path="samtools", partition="sixhour",
+                            time="6:00:00", email="l338m483@ku.edu",
+                            mem_per_cpu="5g", cpus=4, constraint=None,
+                            skip_existing=False):
     """
     Generate SLURM job scripts to convert SAM files to sorted BAM files.
     
@@ -232,10 +246,16 @@ def generate_sam_to_bam_jobs(input_dirs, output_dirs, job_dirs,
             for sam_file in sam_files:
                 # Extract a meaningful name
                 sample_name = sam_file.replace("_bwa-aligned.sam.gz", "")
-                
+
                 # Output BAM file name
                 out_bam = f"{sample_name}_bwa-sorted.bam"
-                
+
+                if skip_existing:
+                    out_path = os.path.join(output_dir, out_bam)
+                    if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+                        logging.info(f"Skipping SAM-to-BAM (already done): {out_bam}")
+                        continue
+
                 # Command to convert SAM to sorted BAM
                 bam_command = (f"zcat {os.path.join(input_dir, sam_file)} | "
                                 f"{samtools_path} view -@ {cpus} -bS - | "
@@ -304,10 +324,11 @@ def index_stampy_reference(reference_genome, python_2_7_path, stampy_path):
 
 def generate_stampy_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
                         python_2_7_path,
-                        stampy_path, 
+                        stampy_path,
                         samtools_path,
-                        partition="sixhour", time="6:00:00", 
-                        email="l338m483@ku.edu", mem_per_cpu="5g", cpus=3, constraint=None):
+                        partition="sixhour", time="6:00:00",
+                        email="l338m483@ku.edu", mem_per_cpu="5g", cpus=3, constraint=None,
+                        skip_existing=False):
     """
     Generate SLURM job scripts to run Stampy on sorted BAM files.
     
@@ -342,10 +363,16 @@ def generate_stampy_jobs(input_dirs, output_dirs, job_dirs, reference_genome,
             for bam_file in bam_files:
                 # Extract a meaningful name
                 sample_name = bam_file.replace("_bwa-sorted.bam", "")
-                
+
                 # Output file name
                 out_bam = f"{sample_name}_stampy.bam"
-                
+
+                if skip_existing:
+                    out_path = os.path.join(output_dir, out_bam)
+                    if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+                        logging.info(f"Skipping Stampy (already done): {out_bam}")
+                        continue
+
                 # Stampy command
                 stampy_command = (f"PATH=$(dirname {samtools_path}):$PATH "  # Set PATH in command context
                                     f"{python_2_7_path} {stampy_path} -t {cpus} --sensitive "

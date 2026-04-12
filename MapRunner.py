@@ -28,6 +28,45 @@ from src.slurm_utilities import *
 # Python 2.7 path for Stampy
 default_python=os.path.expanduser("~/.conda/envs/Python2.7/bin/python")
 
+def collect_pending_jobs(job_dirs, output_dirs, script_prefix, script_suffix,
+                         output_suffix, resume=False):
+    """
+    Collect job scripts to submit, skipping those whose output already exists.
+
+    Parameters:
+    job_dirs (list): Directories containing job scripts
+    output_dirs (list): Paired output directories (same index order as job_dirs)
+    script_prefix (str): Job script filename prefix  e.g. "bwa_"
+    script_suffix (str): Job script filename suffix  e.g. "_alig_job.sh"
+    output_suffix (str): Expected output file suffix e.g. "_bwa-aligned.sam.gz"
+    resume (bool): When True, skip scripts whose output already exists and is non-empty
+
+    Returns:
+    list: Absolute paths of job scripts to submit
+    """
+    all_jobs = []
+    for job_dir, output_dir in zip(job_dirs, output_dirs):
+        job_dir    = os.path.abspath(job_dir)
+        output_dir = os.path.abspath(output_dir)
+        pending  = []
+        skipped  = 0
+        for fname in os.listdir(job_dir):
+            if not (fname.startswith(script_prefix) and fname.endswith(script_suffix)):
+                continue
+            if resume:
+                sample   = fname[len(script_prefix):-len(script_suffix)]
+                out_path = os.path.join(output_dir, f"{sample}{output_suffix}")
+                if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+                    skipped += 1
+                    continue
+            pending.append(os.path.join(job_dir, fname))
+        if skipped:
+            logging.info(f"Skipped {skipped} already-completed jobs in {job_dir}")
+        logging.info(f"Found {len(pending)} pending jobs in {job_dir}")
+        all_jobs.extend(pending)
+    return all_jobs
+
+
 def print_job_summary(step_name, result, total_jobs):
     """
     Print a comprehensive summary of job execution results.
@@ -209,18 +248,11 @@ def main():
                         skip_existing=args.resume)
         
         if args.submit:
-            # Find and submit all BWA jobs from all directories with retry capability
             logging.info("=== Submitting BWA jobs from all directories ===")
-            all_bwa_jobs = []
-            
-            # Collect all BWA jobs from all directories
-            for job_dir in args.job_dirs:
-                bwa_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir)
-                            if f.startswith("bwa_") and f.endswith("_alig_job.sh")]
-                all_bwa_jobs.extend(bwa_jobs)
-                logging.info(f"Found {len(bwa_jobs)} BWA jobs in {job_dir}")
-            
-            # Submit BWA jobs with retry
+            all_bwa_jobs = collect_pending_jobs(
+                args.job_dirs, args.output_dirs,
+                "bwa_", "_alig_job.sh", "_bwa-aligned.sam.gz",
+                resume=args.resume)
             logging.info(f"Submitting {len(all_bwa_jobs)} total BWA jobs with retry capability")
             bwa_result = submit_jobs_with_retry(
                 job_scripts=all_bwa_jobs,
@@ -229,14 +261,13 @@ def main():
                 check_interval=args.check_interval,
                 max_wait_time=args.max_wait_time
             )
-            
             bwa_successful = print_job_summary("BWA", bwa_result, len(all_bwa_jobs))
             if not bwa_successful and args.abort_on_failure:
                 logging.error("Aborting due to BWA failures")
                 sys.exit(1)
             else:
                 logging.info("All BWA jobs completed successfully")
-    
+
     elif args.command == "sambam":
         if len(args.input_dirs) != len(args.output_dirs) or len(args.input_dirs) != len(args.job_dirs):
             logging.error("Error: Number of input, output, and job directories must match")
@@ -249,18 +280,11 @@ def main():
                                 skip_existing=args.resume)
         
         if args.submit:
-            # Find and submit all SAM to BAM jobs from all directories with retry capability
             logging.info("=== Submitting SAM to BAM jobs from all directories ===")
-            all_bam_jobs = []
-            
-            # Collect all SAM to BAM jobs from all directories
-            for job_dir in args.job_dirs:
-                bam_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir)
-                            if f.startswith("bam_") and f.endswith("_sort_job.sh")]
-                all_bam_jobs.extend(bam_jobs)
-                logging.info(f"Found {len(bam_jobs)} SAM to BAM jobs in {job_dir}")
-            
-            # Submit SAM to BAM jobs with retry
+            all_bam_jobs = collect_pending_jobs(
+                args.job_dirs, args.output_dirs,
+                "bam_", "_sort_job.sh", "_bwa-sorted.bam",
+                resume=args.resume)
             logging.info(f"Submitting {len(all_bam_jobs)} total SAM to BAM jobs with retry capability")
             bam_result = submit_jobs_with_retry(
                 job_scripts=all_bam_jobs,
@@ -269,14 +293,13 @@ def main():
                 check_interval=args.check_interval,
                 max_wait_time=args.max_wait_time
             )
-            
             bam_successful = print_job_summary("SAM to BAM", bam_result, len(all_bam_jobs))
             if not bam_successful and args.abort_on_failure:
                 logging.error("Aborting due to SAM to BAM failures")
                 sys.exit(1)
             else:
                 logging.info("All SAM to BAM jobs completed successfully")
-    
+
     elif args.command == "stampy":
         if len(args.input_dirs) != len(args.output_dirs) or len(args.input_dirs) != len(args.job_dirs):
             logging.error("Error: Number of input, output, and job directories must match")
@@ -290,18 +313,11 @@ def main():
                     skip_existing=args.resume)
         
         if args.submit:
-            # Find and submit all Stampy jobs from all directories with retry capability
             logging.info("=== Submitting Stampy jobs from all directories ===")
-            all_stampy_jobs = []
-            
-            # Collect all Stampy jobs from all directories
-            for job_dir in args.job_dirs:
-                stampy_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir)
-                            if f.startswith("stampy_") and f.endswith("_job.sh")]
-                all_stampy_jobs.extend(stampy_jobs)
-                logging.info(f"Found {len(stampy_jobs)} Stampy jobs in {job_dir}")
-            
-            # Submit Stampy jobs with retry
+            all_stampy_jobs = collect_pending_jobs(
+                args.job_dirs, args.output_dirs,
+                "stampy_", "_job.sh", "_stampy.bam",
+                resume=args.resume)
             logging.info(f"Submitting {len(all_stampy_jobs)} total Stampy jobs with retry capability")
             stampy_result = submit_jobs_with_retry(
                 job_scripts=all_stampy_jobs,
@@ -310,14 +326,13 @@ def main():
                 check_interval=args.check_interval,
                 max_wait_time=args.max_wait_time
             )
-            
             stampy_successful = print_job_summary("Stampy", stampy_result, len(all_stampy_jobs))
             if not stampy_successful and args.abort_on_failure:
                 logging.error("Aborting due to Stampy failures")
                 sys.exit(1)
             else:
                 logging.info("All Stampy jobs completed successfully")
-    
+
     elif args.command == "workflow":
         # Verify directory counts match
         if (len(args.input_dirs) != len(args.bwa_dirs) or
@@ -336,18 +351,11 @@ def main():
                         skip_existing=args.resume)
         
         if args.submit:
-            # Submit all BWA jobs from all directories with retry capability
             logging.info("\n=== Submitting BWA jobs from all directories ===")
-            all_bwa_jobs = []
-            
-            # Collect all BWA jobs from all directories
-            for job_dir in args.job_dirs:
-                bwa_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir)
-                        if f.startswith("bwa_") and f.endswith("_alig_job.sh")]
-                all_bwa_jobs.extend(bwa_jobs)
-                logging.info(f"Found {len(bwa_jobs)} BWA jobs in {job_dir}")
-            
-            # Submit BWA jobs with retry
+            all_bwa_jobs = collect_pending_jobs(
+                args.job_dirs, args.bwa_dirs,
+                "bwa_", "_alig_job.sh", "_bwa-aligned.sam.gz",
+                resume=args.resume)
             logging.info(f"Submitting {len(all_bwa_jobs)} total BWA jobs with retry capability")
             bwa_result = submit_jobs_with_retry(
                 job_scripts=all_bwa_jobs,
@@ -356,7 +364,6 @@ def main():
                 check_interval=args.check_interval,
                 max_wait_time=args.max_wait_time
             )
-            
             bwa_successful = print_job_summary("BWA", bwa_result, len(all_bwa_jobs))
             if not bwa_successful:
                 if args.abort_on_failure:
@@ -374,18 +381,11 @@ def main():
                                 skip_existing=args.resume)
         
         if args.submit:
-            # Submit all SAM to BAM jobs from all directories with retry capability
             logging.info("\n=== Submitting SAM to BAM conversion jobs from all directories ===")
-            all_bam_jobs = []
-            
-            # Collect all SAM to BAM jobs from all directories
-            for job_dir in args.job_dirs:
-                bam_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir)
-                        if f.startswith("bam_") and f.endswith("_sort_job.sh")]
-                all_bam_jobs.extend(bam_jobs)
-                logging.info(f"Found {len(bam_jobs)} SAM to BAM jobs in {job_dir}")
-            
-            # Submit SAM to BAM jobs with retry
+            all_bam_jobs = collect_pending_jobs(
+                args.job_dirs, args.bam_dirs,
+                "bam_", "_sort_job.sh", "_bwa-sorted.bam",
+                resume=args.resume)
             logging.info(f"Submitting {len(all_bam_jobs)} total SAM to BAM jobs with retry capability")
             bam_result = submit_jobs_with_retry(
                 job_scripts=all_bam_jobs,
@@ -394,7 +394,6 @@ def main():
                 check_interval=args.check_interval,
                 max_wait_time=args.max_wait_time
             )
-            
             bam_successful = print_job_summary("SAM to BAM", bam_result, len(all_bam_jobs))
             if not bam_successful:
                 if args.abort_on_failure:
@@ -413,18 +412,11 @@ def main():
                         skip_existing=args.resume)
         
         if args.submit:
-            # Submit all Stampy jobs from all directories with retry capability
             logging.info("\n=== Submitting Stampy jobs from all directories ===")
-            all_stampy_jobs = []
-            
-            # Collect all Stampy jobs from all directories
-            for job_dir in args.job_dirs:
-                stampy_jobs = [os.path.join(job_dir, f) for f in os.listdir(job_dir)
-                            if f.startswith("stampy_") and f.endswith("_job.sh")]
-                all_stampy_jobs.extend(stampy_jobs)
-                logging.info(f"Found {len(stampy_jobs)} Stampy jobs in {job_dir}")
-            
-            # Submit Stampy jobs with retry
+            all_stampy_jobs = collect_pending_jobs(
+                args.job_dirs, args.stampy_dirs,
+                "stampy_", "_job.sh", "_stampy.bam",
+                resume=args.resume)
             logging.info(f"Submitting {len(all_stampy_jobs)} total Stampy jobs with retry capability")
             stampy_result = submit_jobs_with_retry(
                 job_scripts=all_stampy_jobs,
@@ -433,7 +425,6 @@ def main():
                 check_interval=args.check_interval,
                 max_wait_time=args.max_wait_time
             )
-            
             stampy_successful = print_job_summary("Stampy", stampy_result, len(all_stampy_jobs))
             if not stampy_successful:
                 if args.abort_on_failure:

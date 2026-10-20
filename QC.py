@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 
 """
-This program will be used to run fastp over a set of fastq files on a high perform    compress_parser.add_argument("--max-    fastp_parser.add_argument("--max-jobs", type=int, default=500,
+This program will be used to run fastp over a set of fastq files on a high performance computing cluster using SLURM as the job scheduler. 
+It will handle the splitting of large fastq files, compression of split files, and running fastp on the split files in a distributed manner 
+across the cluster. The script will also provide status updates and summaries of job execution.
+    
+    fastp_parser.add_argument("--max-jobs", type=int, default=500,
                             help="Maximum number of jobs to submit at once (reduced for stability)")
     fastp_parser.add_argument("--check-interval", type=int, default=120,
                             help="Time between job status checks in seconds (reduced for faster detection)")

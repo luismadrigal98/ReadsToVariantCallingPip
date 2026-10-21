@@ -705,6 +705,10 @@ def generate_global_variant_calling_jobs(input_dirs, output_dir, job_dir,
                 script.write("#SBATCH --mail-type=FAIL\n")
                 script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
                 script.write("\n")
+                script.write("# Fail the job if any part of the pipe fails (e.g., mpileup killed), so it is retried\n")
+                script.write("# instead of leaving a truncated window VCF behind\n")
+                script.write("set -eo pipefail\n")
+                script.write("\n")
                 
                 # Write the command
                 script.write(f"{call_cmd}\n")
@@ -722,7 +726,13 @@ def generate_global_variant_calling_jobs(input_dirs, output_dir, job_dir,
 
 def sort_vcf_files_by_region(vcf_files):
     """
-    Sort VCF files by chromosome and position.
+    Sort window VCF files by chromosome and position.
+    
+    Window files are named "<prefix>_<contig>_<start>-<end>_<caller>_variants.vcf"
+    (e.g., "global_variants_Chr_01_1000001-2000000_bcftools_variants.vcf"). Contigs follow
+    the order of the ##contig lines in the first file (the reference order), and windows
+    within a contig follow their start position, so bcftools concat writes a sorted VCF.
+    Files whose name does not match this pattern go last, in lexicographic order.
     
     Parameters:
     vcf_files (list): List of VCF file paths
@@ -730,24 +740,32 @@ def sort_vcf_files_by_region(vcf_files):
     Returns:
     list: Sorted list of VCF file paths
     """
+    # Contig order from the header of the first file
+    contig_order = {}
+    if vcf_files:
+        with open(vcf_files[0], "r") as vcf:
+            for line in vcf:
+                if not line.startswith("##"):
+                    break
+                match = re.match(r'##contig=<ID=([^,>]+)', line)
+                if match:
+                    contig_order[match.group(1)] = len(contig_order)
+    
     def extract_region_info(filepath):
-        # Extract chromosome and position from filename
+        # Extract contig and start position from filename
         filename = os.path.basename(filepath)
-        parts = filename.split('_')
+        match = re.search(r'_(\d+)-(\d+)_[^_]+_variants\.vcf$', filename)
+        if not match:
+            return (len(contig_order) + 1, filename, 0)
         
-        # Try to find parts with Chr_ or : in them
-        chrom_parts = [p for p in parts if p.startswith('Chr_') or ':' in p]
-        if chrom_parts:
-            region_part = chrom_parts[0]
-            # Handle formats like "Chr_10:8000001-9000000"
-            if ':' in region_part:
-                chrom_str, pos_range = region_part.split(':', 1)
-                chrom = chrom_str.replace('Chr_', '')
-                start, end = map(int, pos_range.split('-'))
-                return (chrom, start, end)
+        # The contig is the longest known contig ID that ends the name before the window
+        name_before_window = filename[:match.start()]
+        contigs = [c for c in contig_order if name_before_window == c or name_before_window.endswith(f"_{c}")]
+        if not contigs:
+            return (len(contig_order), name_before_window, int(match.group(1)))
         
-        # Fallback - just return filename for lexicographical sorting
-        return (filename, 0, 0)
+        contig = max(contigs, key=len)
+        return (contig_order[contig], contig, int(match.group(1)))
     
     return sorted(vcf_files, key=extract_region_info)
 

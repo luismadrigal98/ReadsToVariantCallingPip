@@ -7,6 +7,10 @@ This script integrates three processing steps:
 2. Optional duplicate processing (preserve, mark, or remove)
 3. Indexing of BAM files for downstream analysis
 
+For individuals sequenced in more than one branch (e.g., SE and PE runs), the
+consolidate command joins their merged BAM files and writes one read group per
+branch, in place of add-readgroups.
+
 This tool is part of the StampyToFreeBayesPip pipeline.
 """
 
@@ -76,6 +80,19 @@ def main():
                             help="Directories for job scripts")
     merge_parser.add_argument("--bam-type", type=str, choices=["bwa", "stampy", "all"],
                             default="all", help="Type of BAM files to merge")
+    
+    # Command: consolidate
+    consolidate_parser = subparsers.add_parser("consolidate", parents=[common_parser],
+                                               help="Join the merged BAM files of the same individual across sequencing branches "
+                                                    "(e.g., SE and PE), with one read group per branch (replaces add-readgroups)")
+    consolidate_parser.add_argument("--input-dirs", type=str, nargs="+", required=True,
+                                    help="Directories containing merged sorted BAM files, one per branch")
+    consolidate_parser.add_argument("--branch-labels", type=str, nargs="+", required=True,
+                                    help="Label of each branch, used in the read group IDs (one per input-dir, e.g., SE PE)")
+    consolidate_parser.add_argument("--output-dir", type=str, required=True,
+                                    help="Directory for the consolidated BAM files")
+    consolidate_parser.add_argument("--job-dir", type=str, required=True,
+                                    help="Directory for job scripts")
     
     # Command: dedup
     dedup_parser = subparsers.add_parser("dedup", parents=[common_parser],
@@ -175,6 +192,42 @@ def main():
                     sys.exit(1)
             else:
                 logging.info("All merge jobs completed successfully")
+    
+    elif args.command == "consolidate":
+        if len(args.input_dirs) != len(args.branch_labels):
+            logging.error(f"Error: Number of branch labels ({len(args.branch_labels)}) must match number of input directories ({len(args.input_dirs)})")
+            sys.exit(1)
+        
+        generate_consolidation_jobs(args.input_dirs, args.branch_labels, args.output_dir, args.job_dir,
+                                    samtools_path=args.samtools_path,
+                                    partition=args.partition, time=args.time, email=args.email,
+                                    mem_per_cpu=args.mem_per_cpu, cpus=args.cpus)
+        
+        if args.submit:
+            # Find and submit all consolidation jobs with retry capability
+            logging.info("=== Submitting consolidation jobs ===")
+            consolidation_jobs = [
+                os.path.join(args.job_dir, f) for f in os.listdir(args.job_dir)
+                if f.endswith("_consolidate_job.sh")
+            ]
+            logging.info(f"Found {len(consolidation_jobs)} consolidation jobs in {args.job_dir}")
+            
+            result = submit_jobs_with_retry(
+                job_scripts=consolidation_jobs,
+                max_jobs=args.max_jobs,
+                max_retries=args.max_retries,
+                check_interval=args.check_interval,
+                max_wait_time=args.max_wait_time
+            )
+            
+            if not result['all_successful']:
+                error_msg = f"Consolidation jobs failed: {len(result['final_failures'])} jobs failed after {args.max_retries} retry attempts"
+                logging.error(error_msg)
+                if args.abort_on_failure:
+                    logging.error("Aborting due to consolidation failures")
+                    sys.exit(1)
+            else:
+                logging.info("All consolidation jobs completed successfully")
     
     elif args.command == "dedup":
         if len(args.input_dirs) != len(args.output_dirs_base) or len(args.input_dirs) != len(args.job_dirs):

@@ -5,6 +5,7 @@ Functions:
 - create_directory(directory): Ensures a directory exists, creating it if necessary.
 - detect_bam_files(input_dir, bam_type=None): Detects BAM files in a directory based on type.
 - generate_merge_jobs(input_dirs, output_dirs, job_dirs, ...): Creates SLURM job scripts for merging and sorting BAM files.
+- generate_consolidation_jobs(input_dirs, branch_labels, output_dir, job_dir, ...): Creates SLURM job scripts for joining the merged BAM files of the same individual across sequencing branches, with one read group per branch.
 - generate_duplicate_processing_jobs(input_dirs, output_dirs_base, job_dirs, ...): Creates SLURM job scripts for handling duplicates in BAM files.
 - generate_indexing_jobs(input_dirs, job_dirs, ...): Creates SLURM job scripts for indexing BAM files.
 Each function is designed to automate specific steps in BAM file processing pipelines, 
@@ -91,7 +92,10 @@ def generate_merge_jobs(input_dirs, output_dirs, job_dirs,
                 # Pattern 2: Handle S-number format like "17_S1_L001_R1_001"
                 elif re.match(r'^(\d+)_S\d+', bam_file):
                     sample_name = re.match(r'^(\d+)_S\d+', bam_file).group(1)
-                # Pattern 3: Fallback to first segment before underscore
+                # Pattern 3: Illumina names, optionally prefixed with "Sample_", like "Sample_Mim12_S704_L001_001" - get "Mim12"
+                elif re.match(r'^(?:Sample_)?(.+?)_S\d+_L\d{3}', bam_file):
+                    sample_name = re.match(r'^(?:Sample_)?(.+?)_S\d+_L\d{3}', bam_file).group(1)
+                # Pattern 4: Fallback to first segment before underscore
                 else:
                     parts = bam_file.split('_')
                     if parts:
@@ -180,6 +184,160 @@ def generate_merge_jobs(input_dirs, output_dirs, job_dirs,
                 
         except Exception as e:
             logging.error(f"Error processing directory {input_dir}: {e}")
+
+def generate_consolidation_jobs(input_dirs, branch_labels, output_dir, job_dir,
+                                samtools_path="samtools", partition="sixhour",
+                                time="6:00:00", email="l338m483@ku.edu",
+                                mem_per_cpu="2g", cpus=4):
+    """
+    Generate SLURM job scripts to consolidate the merged BAM files of the same individual
+    sequenced in different branches (e.g., SE and PE runs) into one BAM per individual.
+
+    Each branch BAM gets its own read group before merging (ID = LB = PU = <individual>.<branch>,
+    SM = <individual>), so the variant caller sees one sample while every read still tells
+    which library it came from. Because the read groups are written here, add-readgroups must
+    NOT be run on the consolidated BAMs: it would replace them and set SM to the library ID.
+
+    Individuals are matched across branches by the name before "_bwa_merged_sorted.bam"
+    (or "_stampy_merged_sorted.bam", "_merged_sorted.bam"), ignoring a leading "Sample_" and
+    letter case: "mim12_bwa_merged_sorted.bam" (SE) and "Mim12_bwa_merged_sorted.bam" (PE)
+    both become individual "mim12". Individuals found in only one branch are consolidated from
+    that branch alone. The job checks that the output has as many reads as its inputs, and
+    a manifest of the inputs of each individual is written to consolidation_manifest.tsv in
+    the output directory.
+
+    Parameters:
+    input_dirs (list): Directories containing merged sorted BAM files, one per branch
+    branch_labels (list): Label of each branch (e.g., ["SE", "PE"]), one per input_dir
+    output_dir (str): Directory for the consolidated BAM files
+    job_dir (str): Directory for job scripts
+    samtools_path (str): Path to samtools executable
+    partition (str): SLURM partition to use
+    time (str): Time limit for jobs
+    email (str): Email for notifications
+    mem_per_cpu (str): Memory per CPU
+    cpus (int): Number of CPUs per task
+    """
+    if len(branch_labels) != len(input_dirs):
+        raise ValueError(f"Length of branch_labels ({len(branch_labels)}) must match length of input_dirs ({len(input_dirs)})")
+    if len(set(branch_labels)) != len(branch_labels):
+        raise ValueError(f"Branch labels must be unique: {branch_labels}")
+
+    output_dir = os.path.abspath(output_dir)
+    job_dir = os.path.abspath(job_dir)
+    create_directory(output_dir)
+    create_directory(job_dir)
+
+    # Group the merged BAM files by (individual, file suffix), keeping the branch of each file
+    individual_groups = {}
+    for input_dir, branch_label in zip(input_dirs, branch_labels):
+        input_dir = os.path.abspath(input_dir)
+        merged_files = sorted(f for f in os.listdir(input_dir) if f.endswith('_merged_sorted.bam'))
+
+        if not merged_files:
+            logging.warning(f"No merged sorted BAM files found in {input_dir}")
+            continue
+
+        logging.info(f"Found {len(merged_files)} merged BAM files in branch {branch_label}: {input_dir}")
+
+        for merged_file in merged_files:
+            match = re.match(r'^(?:Sample_)?(.+?)((?:_bwa|_stampy)?_merged_sorted\.bam)$', merged_file)
+            individual = match.group(1).lower()
+            suffix = match.group(2)
+            group = individual_groups.setdefault((individual, suffix), {})
+
+            if branch_label in group:
+                raise ValueError(f"Two BAM files of branch {branch_label} map to individual {individual}: "
+                                 f"{os.path.basename(group[branch_label])} and {merged_file}")
+            group[branch_label] = os.path.join(input_dir, merged_file)
+
+    logging.info(f"Found {len(individual_groups)} individuals to consolidate")
+
+    manifest_path = os.path.join(output_dir, "consolidation_manifest.tsv")
+    with open(manifest_path, "w") as manifest:
+        manifest.write("individual\tread_groups\tn_branches\tinput_bams\toutput_bam\n")
+
+        for (individual, suffix), branch_bams in sorted(individual_groups.items()):
+            output_bam = os.path.join(output_dir, f"{individual}{suffix}")
+            job_name = f"{individual}{suffix.replace('_merged_sorted.bam', '')}"
+
+            # One read group per branch, all with the same sample name
+            tagged_bams = []
+            tagging_commands = []
+            for branch_label, input_bam in branch_bams.items():
+                rg_id = f"{individual}.{branch_label}"
+                tagged_bam = os.path.join(output_dir, f"{individual}{suffix.replace('.bam', '')}.{branch_label}.rg.tmp.bam")
+                tagged_bams.append(tagged_bam)
+                tagging_commands.append(f"{samtools_path} addreplacerg -@ {cpus} -w -O bam "
+                                        f"-r ID:{rg_id} -r SM:{individual} -r LB:{rg_id} -r PL:ILLUMINA -r PU:{rg_id} "
+                                        f"-o {tagged_bam} {input_bam}")
+
+            # Inputs are coordinate sorted, so the merged output is too
+            if len(tagged_bams) == 1:
+                combine_command = f"mv {tagged_bams[0]} {output_bam}"
+            else:
+                combine_command = f"{samtools_path} merge -f -@ {cpus} -o {output_bam} {' '.join(tagged_bams)}"
+
+            input_bams = list(branch_bams.values())
+
+            # Create job script
+            job_script_path = os.path.join(job_dir, f"{job_name}_consolidate_job.sh")
+
+            with open(job_script_path, "w") as script:
+                script.write("#!/bin/bash\n")
+                script.write(f"#SBATCH --job-name=consolidate_{job_name}_job\n")
+                script.write(f"#SBATCH --output={os.path.join(job_dir, f'consolidate_{job_name}_output')}\n")
+                script.write(f"#SBATCH --partition={partition}\n")
+                script.write("#SBATCH --nodes=1\n")
+                script.write("#SBATCH --ntasks=1\n")
+                script.write(f"#SBATCH --cpus-per-task={cpus}\n")
+                script.write(f"#SBATCH --time={time}\n")
+                script.write(f"#SBATCH --mail-user={email}\n")
+                script.write("#SBATCH --mail-type=END,FAIL\n")
+                script.write(f"#SBATCH --mem-per-cpu={mem_per_cpu}\n")
+                script.write("\n")
+                script.write("set -euo pipefail\n")
+                script.write("\n")
+                script.write("# Ensure samtools is in PATH\n")
+                script.write(f"export PATH=$(dirname {samtools_path}):$PATH\n")
+                script.write(f"cd {output_dir}\n")
+                script.write("\n")
+                script.write("# Clean up any existing corrupted output files\n")
+                script.write(f"rm -f {output_bam} {' '.join(tagged_bams)}\n")
+                script.write("\n")
+                script.write("# Give the reads of each branch their own read group\n")
+                for tagging_command in tagging_commands:
+                    script.write(f"{tagging_command}\n")
+                script.write("\n")
+                script.write("# Combine the branches into one BAM for the individual\n")
+                script.write(f"{combine_command}\n")
+                script.write("\n")
+                script.write("# Check that no read was lost before removing the temporary files\n")
+                script.write("n_in=0\n")
+                for input_bam in input_bams:
+                    script.write(f"n_in=$(( n_in + $({samtools_path} view -c -@ {cpus} {input_bam}) ))\n")
+                script.write(f"n_out=$({samtools_path} view -c -@ {cpus} {output_bam})\n")
+                script.write("if [ \"$n_in\" -ne \"$n_out\" ]; then\n")
+                script.write(f"    echo \"Error: {os.path.basename(output_bam)} has $n_out reads, its inputs have $n_in\"\n")
+                script.write(f"    rm -f {output_bam}\n")
+                script.write("    exit 1\n")
+                script.write("fi\n")
+                script.write(f"echo \"Consolidated {individual}: $n_out reads from {len(input_bams)} branch(es)\"\n")
+                script.write(f"rm -f {' '.join(tagged_bams)}\n")
+
+            os.chmod(job_script_path, 0o755)
+
+            manifest.write(f"{individual}\t{','.join(f'{individual}.{b}' for b in branch_bams)}\t{len(branch_bams)}\t"
+                           f"{','.join(input_bams)}\t{output_bam}\n")
+
+    # Report how the individuals are spread across branches
+    branch_combinations = {}
+    for branch_bams in individual_groups.values():
+        combination = "+".join(branch_bams)
+        branch_combinations[combination] = branch_combinations.get(combination, 0) + 1
+    for combination, n_individuals in sorted(branch_combinations.items()):
+        logging.info(f"{n_individuals} individuals with branch(es) {combination}")
+    logging.info(f"Wrote consolidation manifest: {manifest_path}")
 
 def generate_duplicate_processing_jobs(input_dirs, output_dirs_base, job_dirs, 
                                         duplicate_mode="mark_remove", 

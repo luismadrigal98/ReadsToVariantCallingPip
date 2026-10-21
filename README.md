@@ -106,6 +106,16 @@ Calls variants using multiple variant callers and merges results across regions.
   --job-dirs /path/to/job/dir1 /path/to/job/dir2 \
   --duplicate-mode mark_remove \
   --submit
+
+# Join the merged BAMs of individuals sequenced in more than one branch (e.g., SE and PE runs).
+# Each branch gets its own read group (ID = LB = <individual>.<branch>, SM = <individual>);
+# run this instead of add-readgroups, which would replace them
+./BamProcessor.py consolidate \
+  --input-dirs /path/to/SE/merged/dir /path/to/PE/merged/dir \
+  --branch-labels SE PE \
+  --output-dir /path/to/consolidated/dir \
+  --job-dir /path/to/job/dir \
+  --submit
 ```
 
 ### Variant Calling (VariantCaller.py)
@@ -173,6 +183,7 @@ Common options:
 
 3. **BAM Processing (BamProcessor.py)**
    - Merge BAM files by sample
+   - (Optional) Consolidate the BAMs of individuals sequenced in several branches (e.g., SE and PE), with one read group per branch
    - Process duplicates according to specified strategy
    - Add read groups and index BAM files
 
